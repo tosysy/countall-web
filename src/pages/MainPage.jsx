@@ -12,10 +12,8 @@ import {
   shareFolder, unshareFolder, getFolderInviteCode, getFolderMembers,
   setFolderMemberRole, removeFolderMember,
   listenSharedFolder, pushFolderUpdate,
-  shareCounter, unshareCounter, getInviteCode, requestEditPermission, bumpBgVersion,
 } from '../firebase/syncManager'
-import { uploadBackground as storageUpload, folderPath, sharedCounterPath } from '../firebase/storageManager'
-import { uploadBackground as driveUploadBg, deleteBackground as driveDeleteBg } from '../firebase/driveManager'
+import { uploadBackground as storageUpload, folderPath } from '../firebase/storageManager'
 import styles from './MainPage.module.css'
 
 const AVATAR_COLORS = ['#5C6BC0','#26A69A','#66BB6A','#EC407A','#FFA726','#42A5F5','#8D6E63','#78909C']
@@ -54,9 +52,7 @@ export default function MainPage() {
   const [dragKey, setDragKey] = useState(null)
   const [dragOverKey, setDragOverKey] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
-  const [menuCounter, setMenuCounter] = useState(null)  // menú rápido del contador
-  const [menuInviteCode, setMenuInviteCode] = useState(null)
-  const [menuLoading, setMenuLoading] = useState(false)
+  const [expandedShowMenu, setExpandedShowMenu] = useState(false)
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
   const [editFolderColor, setEditFolderColor] = useState(null)
@@ -481,124 +477,6 @@ export default function MainPage() {
     push()
   }
 
-  // ── Counter quick-menu ────────────────────────────────────────────────────
-  const INVITE_BASE_COUNTER = 'https://tosysy.github.io/countall-web/?code='
-
-  const openCounterMenu = (c) => {
-    setMenuCounter(c)
-    setMenuInviteCode(null)
-    setMenuLoading(false)
-    if (c.isShared && c.role === 'owner' && c.sharedId) {
-      getInviteCode(c.sharedId).then(code => setMenuInviteCode(code)).catch(() => {})
-    }
-  }
-
-  const handleMenuChangeBg = () => {
-    if (!menuCounter) return
-    const input = document.createElement('input')
-    input.type = 'file'; input.accept = 'image/*'
-    input.onchange = async (e) => {
-      const file = e.target.files[0]; if (!file) return
-      const url = URL.createObjectURL(file)
-      if (menuCounter.isShared && menuCounter.sharedId) {
-        try {
-          const uploadedUrl = await storageUpload(sharedCounterPath(menuCounter.sharedId), file)
-          updateCounter(menuCounter.id, { backgroundImageUrl: uploadedUrl, backgroundImageLocal: url })
-          pushCounterUpdate({ ...menuCounter, backgroundImageUrl: uploadedUrl })
-        } catch { updateCounter(menuCounter.id, { backgroundImageLocal: url }) }
-      } else {
-        updateCounter(menuCounter.id, { backgroundImageLocal: url })
-        if (driveToken) {
-          driveUploadBg(menuCounter.id, file, driveToken)
-            .then(() => bumpBgVersion())
-            .catch(() => {})
-        }
-      }
-      setMenuCounter(null)
-      schedulePushPersonalData(
-        useAppStore.getState().counters, useAppStore.getState().folders,
-        useAppStore.getState().gridOrder, useAppStore.getState().folderOrders, driveToken
-      )
-    }
-    input.click()
-  }
-
-  const handleMenuRemoveBg = () => {
-    if (!menuCounter) return
-    updateCounter(menuCounter.id, { backgroundImageUrl: null, backgroundImageLocal: null })
-    if (menuCounter.isShared) pushCounterUpdate({ ...menuCounter, backgroundImageUrl: null })
-    else if (driveToken) {
-      driveDeleteBg(menuCounter.id, driveToken).catch(() => {})
-      bumpBgVersion().catch(() => {})
-    }
-    setMenuCounter(null)
-    push()
-  }
-
-  const handleMenuShare = async () => {
-    setMenuLoading(true)
-    try {
-      const { sharedId, inviteCode: code } = await shareCounter(menuCounter)
-      updateCounter(menuCounter.id, { isShared: true, sharedId, role: 'owner', ownerId: user?.uid, ownerUsername: username })
-      setMenuCounter(prev => ({ ...prev, isShared: true, sharedId, role: 'owner' }))
-      setMenuInviteCode(code)
-      push()
-      showToast('Contador compartido ✓')
-    } catch (e) { showToast('Error: ' + e.message) }
-    finally { setMenuLoading(false) }
-  }
-
-  const handleMenuUnshare = async () => {
-    if (!confirm('¿Dejar de compartir este contador?')) return
-    setMenuLoading(true)
-    try {
-      await unshareCounter(menuCounter)
-      updateCounter(menuCounter.id, { isShared: false, sharedId: null, role: 'owner' })
-      setMenuCounter(null)
-      push()
-      showToast('Dejaste de compartir')
-    } catch (e) { showToast('Error: ' + e.message) }
-    finally { setMenuLoading(false) }
-  }
-
-  const handleMenuCopyCode = () => {
-    if (!menuInviteCode) return
-    navigator.clipboard.writeText(INVITE_BASE_COUNTER + menuInviteCode).catch(() => {})
-    showToast('Enlace copiado ✓')
-  }
-
-  const handleMenuReset = () => {
-    if (!confirm('¿Reiniciar el contador a 0?')) return
-    const patch = { value: 0, logEntries: [] }
-    updateCounter(menuCounter.id, patch)
-    if (menuCounter.isShared) pushCounterUpdate({ ...menuCounter, ...patch })
-    else push()
-    setMenuCounter(null)
-    showToast('Contador reiniciado')
-  }
-
-  const handleMenuRequestEdit = async () => {
-    setMenuLoading(true)
-    try {
-      await requestEditPermission(menuCounter)
-      setMenuCounter(null)
-      showToast('Solicitud enviada ✓')
-    } catch (e) { showToast(e.message) }
-    finally { setMenuLoading(false) }
-  }
-
-  const handleMenuAbandon = async () => {
-    if (!confirm('¿Abandonar este contador compartido?')) return
-    setMenuLoading(true)
-    try {
-      await unshareCounter(menuCounter)
-      removeCounter(menuCounter.id)
-      setMenuCounter(null)
-      push()
-    } catch (e) { showToast('Error: ' + e.message) }
-    finally { setMenuLoading(false) }
-  }
-
   const push = () => schedulePushPersonalData(
     useAppStore.getState().counters,
     useAppStore.getState().folders,
@@ -853,7 +731,7 @@ export default function MainPage() {
                     onIncrement={() => !selectionMode && handleIncrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onDecrement={() => !selectionMode && handleDecrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onClick={(c) => selectionMode ? toggleSelect(key) : setExpanded(c)}
-                    onMenu={!selectionMode ? openCounterMenu : undefined}
+                    onMenu={!selectionMode ? (c) => { setExpanded(c); setExpandedShowMenu(true) } : undefined}
                   />
                 ) : (
                   <FolderCard
@@ -980,124 +858,6 @@ export default function MainPage() {
         </div>
       )}
 
-      {/* Menú rápido contador — mismas opciones que el contador ampliado */}
-      {menuCounter && (() => {
-        const mc = menuCounter
-        const mcCanEdit = mc.role === 'owner' || mc.role === 'editor'
-        const mcIsOwner = mc.role === 'owner'
-        const mcHasBg = mc.backgroundImageLocal || mc.backgroundImageUrl || mc.color
-        return (
-          <div className="dialog-backdrop" onClick={() => setMenuCounter(null)}>
-            <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 320, padding: '16px 8px' }}>
-              <h3 style={{ marginBottom: 4, padding: '0 8px' }}>{mc.name}</h3>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {/* Abrir */}
-                <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                  onClick={() => { setExpanded(mc); setMenuCounter(null) }}>
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                  </svg>
-                  Abrir
-                </button>
-                {/* Cambiar imagen */}
-                {mcCanEdit && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                    onClick={handleMenuChangeBg}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                    </svg>
-                    Cambiar imagen
-                  </button>
-                )}
-                {/* Quitar imagen */}
-                {mcCanEdit && mcHasBg && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                    onClick={handleMenuRemoveBg}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                    </svg>
-                    Quitar imagen
-                  </button>
-                )}
-                {/* Compartir */}
-                {!mc.isShared && mcCanEdit && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                    onClick={handleMenuShare} disabled={menuLoading}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
-                    </svg>
-                    {menuLoading ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Compartir'}
-                  </button>
-                )}
-                {/* Dejar de compartir */}
-                {mc.isShared && mcIsOwner && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                    onClick={handleMenuUnshare} disabled={menuLoading}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-                    </svg>
-                    {menuLoading ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Dejar de compartir'}
-                  </button>
-                )}
-                {/* Copiar enlace */}
-                {mc.isShared && menuInviteCode && mcIsOwner && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                    onClick={handleMenuCopyCode}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                    </svg>
-                    Copiar enlace
-                  </button>
-                )}
-                {/* Reiniciar contador */}
-                {mcCanEdit && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                    onClick={handleMenuReset}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
-                    </svg>
-                    Reiniciar contador
-                  </button>
-                )}
-                {/* Solicitar edición */}
-                {mc.isShared && mc.role === 'viewer' && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px' }}
-                    onClick={handleMenuRequestEdit} disabled={menuLoading}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                    </svg>
-                    {menuLoading ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Solicitar edición'}
-                  </button>
-                )}
-                {/* Abandonar contador */}
-                {mc.isShared && !mcIsOwner && (
-                  <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px', color: 'var(--danger)' }}
-                    onClick={handleMenuAbandon} disabled={menuLoading}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L13.67 11H3v2h10.67l-3.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
-                    </svg>
-                    {menuLoading ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Abandonar contador'}
-                  </button>
-                )}
-                {/* Eliminar */}
-                <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, borderRadius: 10, padding: '10px 12px', color: 'var(--danger)' }}
-                  onClick={() => {
-                    if (!confirm(`¿Eliminar "${mc.name}"?`)) return
-                    saveHistory(`Contador "${mc.name}" eliminado`)
-                    removeCounter(mc.id)
-                    setMenuCounter(null)
-                    push()
-                  }}>
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                  </svg>
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
 
       {/* Edit folder */}
       {editingFolder && (
@@ -1270,11 +1030,12 @@ export default function MainPage() {
       {expanded && (
         <ExpandedCounter
           counter={expanded}
-          onClose={() => setExpanded(null)}
+          onClose={() => { setExpanded(null); setExpandedShowMenu(false) }}
           onUpdate={handleCounterUpdate}
           onDelete={() => handleDelete(expanded)}
           onIncrement={() => { const p = handleIncrement(expanded); if (p) setExpanded(prev => ({ ...prev, ...p })) }}
           onDecrement={() => { const p = handleDecrement(expanded); if (p) setExpanded(prev => ({ ...prev, ...p })) }}
+          initialShowMenu={expandedShowMenu}
         />
       )}
 

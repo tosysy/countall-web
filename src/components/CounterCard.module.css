@@ -131,8 +131,9 @@
   flex-shrink: 0;
 }
 .btnMinus {
-  background: var(--log-card-bg);
+  background: var(--card-bg);
   color: var(--btn-minus);
+  border: 1px solid var(--card-stroke);
 }
 .btnPlus {
   background: var(--btn-plus);

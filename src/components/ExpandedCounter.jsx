@@ -18,7 +18,7 @@ const inviteUrl = (code) => INVITE_BASE + code
 const qrUrl = (code) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=ffffff&color=000000&data=${encodeURIComponent(inviteUrl(code))}`
 
-export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement }) {
+export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false }) {
   const { user, username, driveToken } = useAppStore()
 
   const isOwner = counter.role === 'owner'
@@ -37,7 +37,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
   const [tab, setTab] = useState('log')
 
   // Hero states
-  const [showMenu, setShowMenu]         = useState(false)
+  const [showMenu, setShowMenu]         = useState(initialShowMenu)
   const [editingName, setEditingName]   = useState(false)
   const [name, setName]                 = useState(counter.name)
   const [editValue, setEditValue]       = useState(false)

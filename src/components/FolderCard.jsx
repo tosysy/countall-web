@@ -18,10 +18,10 @@ function MiniCounter({ counter }) {
       </span>
       <div className={styles.miniBtns}>
         <div className={styles.miniMinus} style={hasBg ? { background: 'rgba(255,255,255,0.88)', color: '#333', borderColor: 'transparent' } : {}}>
-          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+          <svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
         </div>
         <div className={styles.miniPlus} style={hasBg ? { background: 'rgba(255,255,255,0.88)', color: '#333' } : {}}>
-          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         </div>
       </div>
     </div>

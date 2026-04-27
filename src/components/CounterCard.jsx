@@ -16,6 +16,15 @@ function progressColor(pct) {
   return lerpColor('#FFC107','#52CF48', (pct - 0.5) * 2)
 }
 
+// Luminancia relativa para elegir color de texto legible
+function luminance(hex) {
+  if (!hex || !hex.startsWith('#') || hex.length < 7) return 0.5
+  const r = parseInt(hex.slice(1,3),16)/255
+  const g = parseInt(hex.slice(3,5),16)/255
+  const b = parseInt(hex.slice(5,7),16)/255
+  return 0.299*r + 0.587*g + 0.114*b
+}
+
 export default function CounterCard({ counter, onIncrement, onDecrement, onClick, onMenu }) {
   const longPressTimer = useRef(null)
   const longPressInterval = useRef(null)
@@ -46,6 +55,14 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
   const progColor = hasTarget ? progressColor(pct) : null
 
   const outerStyle = hasTarget ? { '--prog': pct, '--prog-color': progColor } : {}
+
+  // Estilos automáticos de botones según fondo (igual que Android)
+  // Con imagen: ambos botones blancos opacos
+  // Con color: − blanco, + usa el color del contador con texto contrastante
+  const btnMinusStyle = (bg || cardColor) ? { background: '#ffffff', color: '#333', border: 'none' } : {}
+  const btnPlusStyle = cardColor
+    ? { background: cardColor, color: luminance(cardColor) > 0.55 ? '#333' : '#fff', border: 'none' }
+    : bg ? { background: '#ffffff', color: '#333', border: 'none' } : {}
 
   return (
     <div
@@ -112,6 +129,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
       <div className={styles.buttons} onClick={e => e.stopPropagation()}>
         <button
           className={styles.btnMinus}
+          style={btnMinusStyle}
           onPointerDown={() => { onDecrement?.(); startLongPress('minus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >
@@ -119,6 +137,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
         </button>
         <button
           className={styles.btnPlus}
+          style={btnPlusStyle}
           onPointerDown={() => { onIncrement?.(); startLongPress('plus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >

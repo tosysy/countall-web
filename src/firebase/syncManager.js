@@ -44,7 +44,7 @@ export async function pushCounterUpdate(counter) {
     await update(ref(db, `sharedCounters/${counter.sharedId}/data`), base)
     await set(ref(db, `sharedCounters/${counter.sharedId}/scores/${me}`), {
       value: counter.value,
-      logEntries: counter.logEntries.map(e => ({ label: e.label, text: e.text, date: e.date })),
+      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
       deviceId: 'web',
     })
     // Per-user color and target
@@ -62,7 +62,7 @@ export async function pushCounterUpdate(counter) {
     await update(ref(db, `sharedCounters/${counter.sharedId}/data`), {
       ...base,
       value: counter.value,
-      logEntries: counter.logEntries.map(e => ({ label: e.label, text: e.text, date: e.date })),
+      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
     })
   }
 }
@@ -170,12 +170,12 @@ export async function shareCounter(counter, competitive = false) {
     await set(ref(db, `sharedCounters/${sharedId}/data`), baseData)
     await set(ref(db, `sharedCounters/${sharedId}/scores/${me}`), {
       value: counter.value,
-      logEntries: counter.logEntries.map(e => ({ label: e.label, text: e.text, date: e.date })),
+      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
       deviceId: 'web',
     })
   } else {
     baseData.value = counter.value
-    baseData.logEntries = counter.logEntries.map(e => ({ label: e.label, text: e.text, date: e.date }))
+    baseData.logEntries = counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date }))
     await set(ref(db, `sharedCounters/${sharedId}/data`), baseData)
   }
 
@@ -661,7 +661,7 @@ function buildCounterJson(c) {
     isShared: c.isShared, sharedId: c.sharedId ?? null,
     ownerId: c.ownerId ?? null, ownerUsername: c.ownerUsername ?? null,
     role: c.role ?? 'owner',
-    logEntries: c.logEntries.map(e => ({ label: e.label, text: e.text, date: e.date })),
+    logEntries: c.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
   }
 }
 

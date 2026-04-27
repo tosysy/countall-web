@@ -1,10 +1,11 @@
 import styles from './FolderCard.module.css'
 
-export default function FolderCard({ folder, counters, onClick, onMenu, isDragTarget }) {
+export default function FolderCard({ folder, counters, subFolderCount = 0, onClick, onMenu, isDragTarget }) {
   const bg = folder.backgroundImageUrl
   const color = folder.color
-  const count = counters?.length ?? 0
+  const hasOverlay = bg || color
   const preview = counters?.slice(0, 4) ?? []
+  const totalItems = (counters?.length ?? 0) + subFolderCount
 
   return (
     <div
@@ -16,7 +17,7 @@ export default function FolderCard({ folder, counters, onClick, onMenu, isDragTa
       }}
       onClick={() => onClick?.(folder)}
     >
-      {(bg || color) && <div className={styles.overlay} />}
+      {hasOverlay && <div className={styles.overlay} />}
 
       {/* Menu button */}
       <button
@@ -37,33 +38,44 @@ export default function FolderCard({ folder, counters, onClick, onMenu, isDragTa
         </div>
       )}
 
-      <div className={styles.icon} style={bg || color ? { color: '#fff' } : {}}>
-        <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-          <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
-        </svg>
+      {/* Nombre de la carpeta */}
+      <p className={styles.name} style={hasOverlay ? { color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)' } : {}}>
+        {folder.name}
+      </p>
+
+      {/* Preview de contadores */}
+      <div className={`${styles.previewGrid} ${preview.length === 0 ? styles.empty : ''}`}>
+        {preview.length > 0 ? preview.map(c => (
+          <div
+            key={c.id}
+            className={styles.previewCell}
+            style={hasOverlay ? { background: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.25)' } : {}}
+          >
+            <span className={styles.previewName} style={hasOverlay ? { color: 'rgba(255,255,255,0.75)' } : {}}>
+              {c.name}
+            </span>
+            <span className={styles.previewValue} style={hasOverlay ? { color: '#fff' } : {}}>
+              {c.value}
+            </span>
+          </div>
+        )) : (
+          <div className={styles.emptyIcon} style={hasOverlay ? { color: 'rgba(255,255,255,0.5)' } : {}}>
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+              <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+            </svg>
+          </div>
+        )}
       </div>
 
-      <div className={styles.content}>
-        <p className={styles.name} style={bg || color ? { color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)' } : {}}>
-          {folder.name}
-        </p>
-        <p className={styles.count} style={bg || color ? { color: 'rgba(255,255,255,0.7)' } : {}}>
-          {count} {count === 1 ? 'contador' : 'contadores'}
-        </p>
+      {/* Conteo de elementos centrado abajo */}
+      <div className={styles.countBar}>
+        <span
+          className={styles.countBadge}
+          style={hasOverlay ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}
+        >
+          {totalItems}
+        </span>
       </div>
-
-      {preview.length > 0 && !bg && (
-        <div className={styles.preview}>
-          {preview.map(c => (
-            <div key={c.id} className={styles.previewItem}
-              style={{ borderColor: color ? 'rgba(255,255,255,0.4)' : 'var(--preview-border)' }}>
-              <span className={styles.previewValue} style={color ? { color: '#fff' } : {}}>
-                {c.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

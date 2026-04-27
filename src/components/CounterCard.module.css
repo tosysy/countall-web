@@ -74,12 +74,12 @@
   font-weight: 700;
   color: var(--text-secondary);
   text-align: center;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
-  padding: 4px 14px 0;
-  line-height: 1.2;
+  text-overflow: ellipsis;
+  padding: 6px 14px 2px;
+  line-height: 1.4;
+  flex-shrink: 0;
 }
 
 .content {

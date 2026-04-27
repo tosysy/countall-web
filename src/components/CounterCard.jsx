@@ -67,7 +67,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
       {/* Botón menú 3 puntos */}
       {onMenu && (
         <button className={styles.menuBtn}
-          onClick={e => { e.stopPropagation(); onMenu(counter) }}
+          onPointerDown={e => { e.stopPropagation(); onMenu(counter) }}
           style={(bg || cardColor) ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}
         >
           <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
@@ -112,7 +112,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
       <div className={styles.buttons} onClick={e => e.stopPropagation()}>
         <button
           className={styles.btnMinus}
-          style={bg || cardColor ? { background: 'rgba(255,255,255,0.88)', color: '#333' } : {}}
+          style={bg || cardColor ? { background: '#ffffff', color: '#333' } : {}}
           onPointerDown={() => { onDecrement?.(); startLongPress('minus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >
@@ -120,7 +120,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
         </button>
         <button
           className={styles.btnPlus}
-          style={bg || cardColor ? { background: 'rgba(255,255,255,0.88)', color: '#333' } : {}}
+          style={bg || cardColor ? { background: '#ffffff', color: '#333' } : {}}
           onPointerDown={() => { onIncrement?.(); startLongPress('plus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >

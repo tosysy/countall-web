@@ -150,8 +150,8 @@
   transition: transform 0.1s, opacity 0.1s;
 }
 .heroMinus:active, .heroPlus:active { transform: scale(0.91); }
-.heroMinus { background: rgba(255,255,255,0.22); color: #fff; backdrop-filter: blur(4px); }
-.heroPlus  { background: rgba(0,0,0,0.52);       color: #fff; backdrop-filter: blur(4px); }
+.heroMinus { background: var(--card-stroke); color: var(--text-primary); }
+.heroPlus  { background: var(--btn-plus);   color: var(--icon-on-brand); }
 
 /* ── Tabs ─────────────────────────────────────────────────────────────────── */
 .tabs {

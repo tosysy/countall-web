@@ -477,6 +477,20 @@ export default function MainPage() {
     push()
   }
 
+  const handleRemoveFromFolder = (counter) => {
+    if (!counter.folderId) return
+    const folderId = counter.folderId
+    const key = `C:${counter.id}`
+    updateCounter(counter.id, { folderId: null })
+    setGridOrder([...useAppStore.getState().gridOrder, key])
+    setFolderOrder(folderId, (useAppStore.getState().folderOrders[folderId] ?? []).filter(k => k !== key))
+    setExpanded(prev => prev ? { ...prev, folderId: null } : null)
+    schedulePushPersonalData(
+      useAppStore.getState().counters, useAppStore.getState().folders,
+      useAppStore.getState().gridOrder, useAppStore.getState().folderOrders, driveToken
+    )
+  }
+
   const push = () => schedulePushPersonalData(
     useAppStore.getState().counters,
     useAppStore.getState().folders,
@@ -1036,6 +1050,7 @@ export default function MainPage() {
           onIncrement={() => { const p = handleIncrement(expanded); if (p) setExpanded(prev => ({ ...prev, ...p })) }}
           onDecrement={() => { const p = handleDecrement(expanded); if (p) setExpanded(prev => ({ ...prev, ...p })) }}
           initialShowMenu={expandedShowMenu}
+          onRemoveFromFolder={() => handleRemoveFromFolder(expanded)}
         />
       )}
 

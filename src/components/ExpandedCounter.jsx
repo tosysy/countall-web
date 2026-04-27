@@ -18,13 +18,25 @@ const inviteUrl = (code) => INVITE_BASE + code
 const qrUrl = (code) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=ffffff&color=000000&data=${encodeURIComponent(inviteUrl(code))}`
 
-export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false }) {
+function luminance(hex) {
+  if (!hex || !hex.startsWith('#') || hex.length < 7) return 0.5
+  const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255
+  return 0.299*r + 0.587*g + 0.114*b
+}
+
+export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false, onRemoveFromFolder }) {
   const { user, username, driveToken } = useAppStore()
 
   const isOwner = counter.role === 'owner'
   const canEdit = counter.role === 'owner' || counter.role === 'editor'
   const bg = counter.backgroundImageLocal || counter.backgroundImageUrl
   const cardColor = counter.color
+
+  // Estilos automáticos de botones hero (igual que CounterCard)
+  const heroBtnMinusStyle = (bg || cardColor) ? { background: '#ffffff', color: '#333' } : {}
+  const heroBtnPlusStyle  = cardColor
+    ? { background: cardColor, color: luminance(cardColor) > 0.55 ? '#333' : '#fff' }
+    : bg ? { background: '#ffffff', color: '#333' } : {}
 
   // Tabs
   const tabs = [
@@ -303,6 +315,9 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                       <button onClick={() => { setShowMenu(false); setShowQr(v => !v) }}>Ver QR</button>
                     </>
                   )}
+                  {counter.folderId && onRemoveFromFolder && (
+                    <button onClick={() => { setShowMenu(false); onRemoveFromFolder() }}>Sacar de la carpeta</button>
+                  )}
                   {canEdit && <button onClick={handleReset}>Reiniciar contador</button>}
                   {counter.isShared && counter.role === 'viewer' && (
                     <button onClick={handleRequestEdit}>Solicitar edición</button>
@@ -343,10 +358,10 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
           {/* +/- buttons */}
           {canEdit && (
             <div className={styles.heroButtons}>
-              <button className={styles.heroMinus} onClick={onDecrement} onContextMenu={e => e.preventDefault()}>
+              <button className={styles.heroMinus} style={heroBtnMinusStyle} onClick={onDecrement} onContextMenu={e => e.preventDefault()}>
                 <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
               </button>
-              <button className={styles.heroPlus} onClick={onIncrement} onContextMenu={e => e.preventDefault()}>
+              <button className={styles.heroPlus} style={heroBtnPlusStyle} onClick={onIncrement} onContextMenu={e => e.preventDefault()}>
                 <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               </button>
             </div>

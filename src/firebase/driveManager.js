@@ -51,7 +51,7 @@ async function getFileId(name, token) {
 
 export async function uploadBundle(bundle, token) {
   const existing = await getFileId(BUNDLE_NAME, token)
-  const meta = JSON.stringify({ name: BUNDLE_NAME, parents: ['appDataFolder'] })
+  const meta = JSON.stringify({ name: BUNDLE_NAME, ...(existing ? {} : { parents: ['appDataFolder'] }) })
   const boundary = 'CountAllBoundary'
   const multipart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${bundle}\r\n--${boundary}--`
 

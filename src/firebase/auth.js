@@ -1,6 +1,5 @@
 import {
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   signOut as firebaseSignOut,
@@ -20,24 +19,13 @@ export function buildGoogleProvider() {
 }
 
 /**
- * Inicia sesión con Google.
- * En iOS la ventana emergente falla, así que se usa redirect como fallback.
- * Devuelve { user, accessToken } donde accessToken sirve para Drive API.
+ * Inicia sesión con Google usando redirect (compatible con GitHub Pages / COOP).
+ * El resultado llega en handleRedirectResult al volver de Google.
  */
 export async function signInWithGoogle() {
   const provider = buildGoogleProvider()
-  try {
-    const result = await signInWithPopup(auth, provider)
-    const credential = GoogleAuthProvider.credentialFromResult(result)
-    return { user: result.user, accessToken: credential?.accessToken ?? null }
-  } catch (err) {
-    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
-      // Fallback a redirect (iOS, Safari estricto)
-      await signInWithRedirect(auth, provider)
-      return null // Se redirige; el resultado llega en handleRedirectResult
-    }
-    throw err
-  }
+  await signInWithRedirect(auth, provider)
+  return null // página redirige; resultado en handleRedirectResult
 }
 
 /**
@@ -48,6 +36,8 @@ export async function handleRedirectResult() {
   try {
     const result = await getRedirectResult(auth)
     if (!result) return null
+    // Éxito: limpiar flag de refresco silencioso
+    sessionStorage.removeItem('drive_refresh_attempted')
     const credential = GoogleAuthProvider.credentialFromResult(result)
     return { user: result.user, accessToken: credential?.accessToken ?? null }
   } catch {
@@ -56,19 +46,17 @@ export async function handleRedirectResult() {
 }
 
 /**
- * Obtiene un access token nuevo haciendo popup silencioso
- * (el usuario ya tiene sesión activa en el navegador).
+ * Obtiene un nuevo access token de Drive redirigiendo silenciosamente.
+ * Usa sessionStorage para evitar bucles si Google no tiene sesión activa.
+ * El token llega en handleRedirectResult al volver de Google.
  */
 export async function refreshDriveToken() {
+  if (sessionStorage.getItem('drive_refresh_attempted')) return null
+  sessionStorage.setItem('drive_refresh_attempted', '1')
   const provider = buildGoogleProvider()
-  provider.setCustomParameters({ prompt: 'none' }) // sin UI si ya hay sesión
-  try {
-    const result = await signInWithPopup(auth, provider)
-    const credential = GoogleAuthProvider.credentialFromResult(result)
-    return credential?.accessToken ?? null
-  } catch {
-    return null
-  }
+  provider.setCustomParameters({ prompt: 'none' })
+  await signInWithRedirect(auth, provider)
+  return null // resultado en handleRedirectResult
 }
 
 export async function signOut() {

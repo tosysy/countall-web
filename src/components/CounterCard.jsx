@@ -112,7 +112,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
       <div className={styles.buttons} onClick={e => e.stopPropagation()}>
         <button
           className={styles.btnMinus}
-          style={bg || cardColor ? { background: 'rgba(255,255,255,0.2)', color: '#fff' } : {}}
+          style={bg || cardColor ? { background: 'rgba(255,255,255,0.88)', color: '#333' } : {}}
           onPointerDown={() => { onDecrement?.(); startLongPress('minus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >
@@ -120,7 +120,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
         </button>
         <button
           className={styles.btnPlus}
-          style={bg || cardColor ? { background: 'rgba(255,255,255,0.25)', color: '#fff' } : {}}
+          style={bg || cardColor ? { background: 'rgba(255,255,255,0.88)', color: '#333' } : {}}
           onPointerDown={() => { onIncrement?.(); startLongPress('plus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >

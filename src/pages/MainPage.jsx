@@ -52,6 +52,7 @@ export default function MainPage() {
   const [dragKey, setDragKey] = useState(null)
   const [dragOverKey, setDragOverKey] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
+  const [menuCounter, setMenuCounter] = useState(null)  // menú rápido del contador
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
   const [editFolderColor, setEditFolderColor] = useState(null)
@@ -730,7 +731,7 @@ export default function MainPage() {
                     onIncrement={() => !selectionMode && handleIncrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onDecrement={() => !selectionMode && handleDecrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onClick={(c) => selectionMode ? toggleSelect(key) : setExpanded(c)}
-                    onMenu={!selectionMode ? (c) => setExpanded(c) : undefined}
+                    onMenu={!selectionMode ? (c) => setMenuCounter(c) : undefined}
                   />
                 ) : (
                   <FolderCard
@@ -852,6 +853,40 @@ export default function MainPage() {
             <div style={{ display:'flex', gap:'8px', marginTop:'16px', justifyContent:'flex-end' }}>
               <button className="btn-ghost" onClick={() => setShowCreateFolder(false)}>Cancelar</button>
               <button className="btn-primary" onClick={handleCreateFolder}>Crear</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Menú rápido contador */}
+      {menuCounter && (
+        <div className="dialog-backdrop" onClick={() => setMenuCounter(null)}>
+          <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 320 }}>
+            <h3 style={{ marginBottom: 16 }}>{menuCounter.name}</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12 }}
+                onClick={() => { setExpanded(menuCounter); setMenuCounter(null) }}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                </svg>
+                Abrir
+              </button>
+              <button className="btn-ghost" style={{ justifyContent: 'flex-start', gap: 12, color: 'var(--danger)' }}
+                onClick={() => {
+                  if (!confirm(`¿Eliminar "${menuCounter.name}"?`)) return
+                  saveHistory(`Contador "${menuCounter.name}" eliminado`)
+                  removeCounter(menuCounter.id)
+                  setMenuCounter(null)
+                  push()
+                }}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                </svg>
+                Eliminar
+              </button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn-ghost" onClick={() => setMenuCounter(null)}>Cancelar</button>
             </div>
           </div>
         </div>

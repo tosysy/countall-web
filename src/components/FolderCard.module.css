@@ -58,13 +58,13 @@
 
 /* ── Grid de preview ─────────────────────────────────────────────────────── */
 .previewGrid {
-  flex: 1;
+  width: 100%;
+  aspect-ratio: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: 4px;
   position: relative; z-index: 2;
-  min-height: 0;
 }
 .previewGrid.empty {
   display: flex; align-items: center; justify-content: center;

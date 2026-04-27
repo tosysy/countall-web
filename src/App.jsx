@@ -201,20 +201,25 @@ export default function App() {
       //    re-dispara onAuthStateChanged con el mismo usuario.
       const redirectRes = await handleRedirectResult()
       if (redirectRes?.accessToken) {
+        // Flujo redirect: usar token recién obtenido
         tokenRefreshedRef.current = true
         setDriveToken(redirectRes.accessToken, Date.now() + 3600_000)
         initPersonalSync(redirectRes.accessToken)
-      } else if (!tokenRefreshedRef.current && !useAppStore.getState().driveToken) {
-        // Intento silencioso: válido si el usuario ya tiene sesión Google activa y aún
-        // no tenemos token (evita duplicados si LoginPage ya llamó a initPersonalSync).
-        // No bloquea la navegación — se ejecuta en paralelo.
+      } else if (!tokenRefreshedRef.current) {
         tokenRefreshedRef.current = true
-        refreshDriveToken().then(token => {
-          if (token && !useAppStore.getState().driveToken) {
-            setDriveToken(token, Date.now() + 3600_000)
-            initPersonalSync(token)
-          }
-        }).catch(() => {}) // Si falla (popup bloqueado, sin sesión Google), ignorar
+        const { driveToken: saved, driveTokenExpiry } = useAppStore.getState()
+        if (saved && Date.now() < driveTokenExpiry) {
+          // Token persistido todavía válido — usarlo directamente (evita popup en recarga)
+          initPersonalSync(saved)
+        } else {
+          // Token expirado o ausente — intentar popup silencioso como fallback
+          refreshDriveToken().then(token => {
+            if (token) {
+              setDriveToken(token, Date.now() + 3600_000)
+              initPersonalSync(token)
+            }
+          }).catch(() => {})
+        }
       }
     }
 

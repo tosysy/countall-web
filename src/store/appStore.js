@@ -190,6 +190,9 @@ const useAppStore = create(
         theme: s.theme,
         username: s.username,
         history: s.history,
+        // Token de Drive persiste para que funcione tras recargas (válido 1h)
+        driveToken: s.driveToken,
+        driveTokenExpiry: s.driveTokenExpiry,
       }),
     }
   )

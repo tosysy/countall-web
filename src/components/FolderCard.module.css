@@ -29,7 +29,7 @@
   z-index: 1;
 }
 
-/* ── Preview grid fills entire card ─────────────────────────────────────── */
+/* ── Preview grid fills entire card (padding keeps cells smaller) ────────── */
 .previewGrid {
   position: absolute;
   inset: 0;
@@ -37,7 +37,8 @@
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: 3px;
-  padding: 3px;
+  /* top=28 + bottom=20 = sides*2 → cells always square */
+  padding: 28px 24px 20px;
 }
 .previewGrid.empty {
   display: flex;

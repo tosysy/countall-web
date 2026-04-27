@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { onAuthChange, handleRedirectResult, getUsername, refreshDriveToken } from './firebase/auth'
+import { onAuthChange, handleRedirectResult, getUsername, refreshDriveToken, isAuthRedirectPending } from './firebase/auth'
 import { listenDataVersion, listenBgVersion, pullPersonalData, restoreLinkedSharedItems } from './firebase/syncManager'
 import { downloadAllBackgrounds } from './firebase/driveManager'
 import useAppStore from './store/appStore'
@@ -178,6 +178,9 @@ export default function App() {
 
     const handleUser = async (user) => {
       if (!user) {
+        // Si hay un redirect OAuth en curso, esperar — Firebase dispara null brevemente
+        // antes de procesar el resultado del redirect, lo que causaría un bucle /login.
+        if (isAuthRedirectPending()) return
         clearData()
         navigate('/login', { replace: true })
         return

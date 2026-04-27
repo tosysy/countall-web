@@ -33,10 +33,13 @@ export default function LoginPage({ onDriveToken }) {
       <div className={styles.card}>
         <div className={styles.logo}>
           <div className={styles.logoIcon}>
-            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 8v4l3 3"/>
-            </svg>
+            <img
+              src="https://raw.githubusercontent.com/tosysy/CountAll/main/icon-192.png"
+              alt="CountAll"
+              width="72"
+              height="72"
+              style={{ borderRadius: 16 }}
+            />
           </div>
           <h1 className={styles.title}>CountAll</h1>
           <p className={styles.subtitle}>Contadores personales y compartidos</p>

@@ -24,6 +24,9 @@ export function buildGoogleProvider() {
  */
 export async function signInWithGoogle() {
   const provider = buildGoogleProvider()
+  // Marcar que hay un redirect OAuth pendiente para que onAuthStateChanged(null)
+  // no navegue a /login mientras Firebase procesa el resultado.
+  sessionStorage.setItem('auth_redirect_pending', '1')
   await signInWithRedirect(auth, provider)
   return null // página redirige; resultado en handleRedirectResult
 }
@@ -35,12 +38,14 @@ export async function signInWithGoogle() {
 export async function handleRedirectResult() {
   try {
     const result = await getRedirectResult(auth)
+    // Redirect procesado (con o sin resultado): limpiar flags
+    sessionStorage.removeItem('auth_redirect_pending')
     if (!result) return null
-    // Éxito: limpiar flag de refresco silencioso
     sessionStorage.removeItem('drive_refresh_attempted')
     const credential = GoogleAuthProvider.credentialFromResult(result)
     return { user: result.user, accessToken: credential?.accessToken ?? null }
   } catch {
+    sessionStorage.removeItem('auth_redirect_pending')
     return null
   }
 }
@@ -53,10 +58,16 @@ export async function handleRedirectResult() {
 export async function refreshDriveToken() {
   if (sessionStorage.getItem('drive_refresh_attempted')) return null
   sessionStorage.setItem('drive_refresh_attempted', '1')
+  sessionStorage.setItem('auth_redirect_pending', '1')
   const provider = buildGoogleProvider()
   provider.setCustomParameters({ prompt: 'none' })
   await signInWithRedirect(auth, provider)
   return null // resultado en handleRedirectResult
+}
+
+/** True si hay un redirect OAuth en curso (para bloquear navegación a /login). */
+export function isAuthRedirectPending() {
+  return sessionStorage.getItem('auth_redirect_pending') === '1'
 }
 
 export async function signOut() {

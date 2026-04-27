@@ -182,8 +182,9 @@ const useAppStore = create(
       name: 'countall-storage',
       // No persistir user ni driveToken (sensibles / se restauran en cada sesión)
       partialize: (s) => ({
-        counters: s.counters,
-        folders: s.folders,
+        // Limpiar backgroundImageLocal (blob URL) — no sobrevive recargas de página
+        counters: s.counters.map(c => ({ ...c, backgroundImageLocal: null })),
+        folders: s.folders.map(f => ({ ...f, backgroundImageLocal: null })),
         gridOrder: s.gridOrder,
         folderOrders: s.folderOrders,
         theme: s.theme,

@@ -278,7 +278,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                   onBlur={saveName} onKeyDown={e => e.key === 'Enter' && saveName()} />
               ) : (
                 <button className={styles.heroName} onClick={() => canEdit && setEditingName(true)}>
-                  {ROLE_BADGE[counter.role] && <span className={styles.roleBadge}>{ROLE_BADGE[counter.role]}</span>}
+                  {counter.isShared && ROLE_BADGE[counter.role] && <span className={styles.roleBadge}>{ROLE_BADGE[counter.role]}</span>}
                   {counter.name}
                 </button>
               )}

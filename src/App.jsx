@@ -251,6 +251,16 @@ export default function App() {
       }
     }
 
+    // Descarga inicial de imágenes de fondo (blob URLs no sobreviven recargas)
+    downloadAllBackgrounds(token).then(bgs => {
+      const store = useAppStore.getState()
+      store.counters.forEach(c => {
+        if (!c.isShared && bgs[c.id]) {
+          updateCounter(c.id, { backgroundImageLocal: bgs[c.id] })
+        }
+      })
+    }).catch(() => {})
+
     // Escuchar dataVersion → pull de Drive cuando cambie desde otro dispositivo
     const unsub1 = listenDataVersion(async () => {
       const data = await pullPersonalData(token).catch(() => null)

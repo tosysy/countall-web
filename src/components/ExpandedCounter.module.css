@@ -150,7 +150,7 @@
   transition: transform 0.1s, opacity 0.1s;
 }
 .heroMinus:active, .heroPlus:active { transform: scale(0.91); }
-.heroMinus { background: var(--card-stroke); color: var(--text-primary); }
+.heroMinus { background: var(--bg); color: var(--btn-minus); }
 .heroPlus  { background: var(--btn-plus);   color: var(--icon-on-brand); }
 
 /* ── Tabs ─────────────────────────────────────────────────────────────────── */

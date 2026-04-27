@@ -143,7 +143,7 @@ export default function FolderCard({ folder, folderCounters = [], subFolders = [
       {/* Conteo centrado abajo */}
       <div className={styles.countBar}>
         <span className={styles.countBadge} style={hasOverlay ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}>
-          {totalItems}
+          {totalItems} {totalItems === 1 ? 'elemento' : 'elementos'}
         </span>
       </div>
     </div>

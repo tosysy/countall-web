@@ -115,8 +115,15 @@
 }
 .counterNotif:hover { background: var(--log-card-bg); }
 
-.checkbox {
+.dragHandle {
   position: absolute; top: 8px; left: 8px;
+  width: 24px; height: 24px; border-radius: 6px;
+  background: rgba(0,0,0,0.3); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10;
+}
+.checkbox {
+  position: absolute; top: 8px; right: 8px;
   width: 22px; height: 22px; border-radius: 50%;
   background: rgba(255,255,255,0.85);
   border: 2px solid var(--card-stroke);

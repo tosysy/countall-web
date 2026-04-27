@@ -205,7 +205,14 @@ export default function MainPage() {
       return next
     })
   }
-  const selectAll = () => setSelectedKeys(new Set(items.map(i => `${i.type==='counter'?'C':'F'}:${i.data.id}`)))
+  const allKeys = items.map(i => `${i.type==='counter'?'C':'F'}:${i.data.id}`)
+  const selectAll = () => {
+    if (selectedKeys.size === allKeys.length) {
+      setSelectedKeys(new Set()) // deseleccionar todo
+    } else {
+      setSelectedKeys(new Set(allKeys)) // seleccionar todo
+    }
+  }
 
   const handleLongPress = (key) => {
     clearTimeout(longPressTimer.current)
@@ -723,6 +730,7 @@ export default function MainPage() {
                     onIncrement={() => !selectionMode && handleIncrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onDecrement={() => !selectionMode && handleDecrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onClick={(c) => selectionMode ? toggleSelect(key) : setExpanded(c)}
+                    onMenu={!selectionMode ? (c) => setExpanded(c) : undefined}
                   />
                 ) : (
                   <FolderCard
@@ -735,16 +743,23 @@ export default function MainPage() {
                     isDragTarget={isFolderDropTarget}
                   />
                 )}
-                {/* Checkbox en modo selección */}
+                {/* Overlay modo selección: drag handle izquierda, checkbox derecha */}
                 {selectionMode && (
-                  <div className={`${styles.checkbox} ${isSelected ? styles.checkboxOn : ''}`}
-                    onPointerDown={e => { e.stopPropagation(); toggleSelect(key) }}>
-                    {isSelected && (
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                  <>
+                    <div className={styles.dragHandle}>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
                       </svg>
-                    )}
-                  </div>
+                    </div>
+                    <div className={`${styles.checkbox} ${isSelected ? styles.checkboxOn : ''}`}
+                      onPointerDown={e => { e.stopPropagation(); toggleSelect(key) }}>
+                      {isSelected && (
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )

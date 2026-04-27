@@ -34,7 +34,7 @@ img { display: block; max-width: 100%; }
   --dialog-bg: #FFFFFF;
   --danger: #EF5350;
   --blue: #1E88E5;
-  --radius-card: 16px;
+  --radius-card: 24px;
   --radius-btn: 10px;
   --shadow: 0 2px 8px rgba(0,0,0,0.08);
 }

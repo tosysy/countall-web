@@ -52,7 +52,8 @@
   word-break: break-word;
   line-height: 1.3;
   position: relative; z-index: 2;
-  padding-right: 24px;
+  text-align: center;
+  padding: 0 24px;
 }
 
 /* ── Grid de preview ─────────────────────────────────────────────────────── */
@@ -60,7 +61,7 @@
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-auto-rows: 1fr;
+  grid-template-rows: 1fr 1fr;
   gap: 4px;
   position: relative; z-index: 2;
   min-height: 0;
@@ -115,7 +116,7 @@
   flex-shrink: 0;
 }
 .miniMinus {
-  background: var(--log-card-bg);
+  background: var(--card-bg);
   color: var(--btn-minus);
   border: 1px solid var(--card-stroke);
 }

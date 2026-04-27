@@ -16,7 +16,7 @@ function progressColor(pct) {
   return lerpColor('#FFC107','#52CF48', (pct - 0.5) * 2)
 }
 
-export default function CounterCard({ counter, onIncrement, onDecrement, onClick, onLongPress }) {
+export default function CounterCard({ counter, onIncrement, onDecrement, onClick, onMenu }) {
   const longPressTimer = useRef(null)
   const longPressInterval = useRef(null)
   const [pressing, setPressing] = useState(null) // 'plus' | 'minus'
@@ -63,6 +63,18 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
     >
       {/* Overlay para texto legible sobre fondo de imagen */}
       {(bg || cardColor) && <div className={styles.overlay} />}
+
+      {/* Botón menú 3 puntos */}
+      {onMenu && (
+        <button className={styles.menuBtn}
+          onClick={e => { e.stopPropagation(); onMenu(counter) }}
+          style={(bg || cardColor) ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+            <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+          </svg>
+        </button>
+      )}
 
       {/* Indicador compartido */}
       {counter.isShared && (

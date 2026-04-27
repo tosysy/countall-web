@@ -1,11 +1,82 @@
 import styles from './FolderCard.module.css'
 
-export default function FolderCard({ folder, counters, subFolderCount = 0, onClick, onMenu, isDragTarget }) {
+function MiniCounter({ counter }) {
+  const hasBg = counter.backgroundImageLocal || counter.color
+  const style = {
+    backgroundColor: counter.color || undefined,
+    backgroundImage: counter.backgroundImageLocal ? `url(${counter.backgroundImageLocal})` : undefined,
+    backgroundSize: 'cover', backgroundPosition: 'center',
+  }
+  return (
+    <div className={styles.miniCard} style={style}>
+      {hasBg && <div className={styles.miniOverlay} />}
+      <span className={styles.miniName} style={hasBg ? { color: 'rgba(255,255,255,0.85)' } : {}}>
+        {counter.name}
+      </span>
+      <span className={styles.miniValue} style={hasBg ? { color: '#fff' } : {}}>
+        {counter.value}
+      </span>
+      <div className={styles.miniBtns}>
+        <div className={styles.miniMinus} style={hasBg ? { background: 'rgba(255,255,255,0.2)' } : {}}>
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+        </div>
+        <div className={styles.miniPlus} style={hasBg ? { background: 'rgba(255,255,255,0.3)' } : {}}>
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MiniFolder({ folder }) {
+  const hasBg = folder.backgroundImageUrl || folder.color
+  const style = {
+    backgroundColor: folder.color || undefined,
+    backgroundImage: folder.backgroundImageUrl ? `url(${folder.backgroundImageUrl})` : undefined,
+    backgroundSize: 'cover', backgroundPosition: 'center',
+  }
+  return (
+    <div className={styles.miniCard} style={style}>
+      {hasBg && <div className={styles.miniOverlay} />}
+      <div className={styles.miniFolderIcon} style={hasBg ? { color: 'rgba(255,255,255,0.8)' } : {}}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+          <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+        </svg>
+      </div>
+      <span className={styles.miniName} style={hasBg ? { color: 'rgba(255,255,255,0.9)' } : {}}>
+        {folder.name}
+      </span>
+    </div>
+  )
+}
+
+export default function FolderCard({ folder, folderCounters = [], subFolders = [], folderOrder = [], onClick, onMenu, isDragTarget }) {
   const bg = folder.backgroundImageUrl
   const color = folder.color
   const hasOverlay = bg || color
-  const preview = counters?.slice(0, 4) ?? []
-  const totalItems = (counters?.length ?? 0) + subFolderCount
+
+  // Ordenar items respetando folderOrder
+  const counterMap = Object.fromEntries(folderCounters.map(c => [c.id, c]))
+  const subFolderMap = Object.fromEntries(subFolders.map(f => [f.id, f]))
+  const ordered = []
+  const seenC = new Set(), seenF = new Set()
+
+  for (const key of folderOrder) {
+    if (key.startsWith('C:')) {
+      const c = counterMap[key.slice(2)]
+      if (c && !seenC.has(c.id)) { seenC.add(c.id); ordered.push({ type: 'counter', data: c }) }
+    } else if (key.startsWith('F:')) {
+      const f = subFolderMap[key.slice(2)]
+      if (f && !seenF.has(f.id)) { seenF.add(f.id); ordered.push({ type: 'folder', data: f }) }
+    }
+  }
+  // Items no incluidos en el orden
+  folderCounters.forEach(c => { if (!seenC.has(c.id)) ordered.push({ type: 'counter', data: c }) })
+  subFolders.forEach(f => { if (!seenF.has(f.id)) ordered.push({ type: 'folder', data: f }) })
+
+  const preview = ordered.slice(0, 4)
+  const overflow = ordered.length - 4
+  const totalItems = ordered.length
 
   return (
     <div
@@ -38,27 +109,29 @@ export default function FolderCard({ folder, counters, subFolderCount = 0, onCli
         </div>
       )}
 
-      {/* Nombre de la carpeta */}
+      {/* Nombre */}
       <p className={styles.name} style={hasOverlay ? { color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)' } : {}}>
         {folder.name}
       </p>
 
-      {/* Preview de contadores */}
+      {/* Grid preview */}
       <div className={`${styles.previewGrid} ${preview.length === 0 ? styles.empty : ''}`}>
-        {preview.length > 0 ? preview.map(c => (
-          <div
-            key={c.id}
-            className={styles.previewCell}
-            style={hasOverlay ? { background: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.25)' } : {}}
-          >
-            <span className={styles.previewName} style={hasOverlay ? { color: 'rgba(255,255,255,0.75)' } : {}}>
-              {c.name}
-            </span>
-            <span className={styles.previewValue} style={hasOverlay ? { color: '#fff' } : {}}>
-              {c.value}
-            </span>
-          </div>
-        )) : (
+        {preview.length > 0 ? (
+          <>
+            {preview.map(item =>
+              item.type === 'counter'
+                ? <MiniCounter key={item.data.id} counter={item.data} />
+                : <MiniFolder key={item.data.id} folder={item.data} />
+            )}
+            {overflow > 0 && (
+              <div className={styles.overflowCell} style={hasOverlay ? { background: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.25)' } : {}}>
+                <span className={styles.overflowText} style={hasOverlay ? { color: '#fff' } : {}}>
+                  +{overflow}
+                </span>
+              </div>
+            )}
+          </>
+        ) : (
           <div className={styles.emptyIcon} style={hasOverlay ? { color: 'rgba(255,255,255,0.5)' } : {}}>
             <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
               <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
@@ -67,12 +140,9 @@ export default function FolderCard({ folder, counters, subFolderCount = 0, onCli
         )}
       </div>
 
-      {/* Conteo de elementos centrado abajo */}
+      {/* Conteo centrado abajo */}
       <div className={styles.countBar}>
-        <span
-          className={styles.countBadge}
-          style={hasOverlay ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}
-        >
+        <span className={styles.countBadge} style={hasOverlay ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}>
           {totalItems}
         </span>
       </div>

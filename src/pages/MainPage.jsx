@@ -727,8 +727,9 @@ export default function MainPage() {
                 ) : (
                   <FolderCard
                     folder={item.data}
-                    counters={getFolderCounters(item.data.id)}
-                    subFolderCount={folders.filter(f => f.parentFolderId === item.data.id).length}
+                    folderCounters={getFolderCounters(item.data.id)}
+                    subFolders={folders.filter(f => f.parentFolderId === item.data.id)}
+                    folderOrder={folderOrders[item.data.id] ?? []}
                     onClick={(f) => selectionMode ? toggleSelect(key) : setCurrentFolder(f.id)}
                     onMenu={!selectionMode ? handleFolderMenu : undefined}
                     isDragTarget={isFolderDropTarget}

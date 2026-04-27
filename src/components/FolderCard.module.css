@@ -25,12 +25,9 @@
 .menuBtn {
   position: absolute; top: 8px; right: 8px;
   width: 26px; height: 26px; border-radius: 50%;
-  background: rgba(0,0,0,0.28);
-  color: #fff;
+  background: rgba(0,0,0,0.28); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  z-index: 3;
-  opacity: 0;
-  transition: opacity 0.15s;
+  z-index: 3; opacity: 0; transition: opacity 0.15s;
 }
 .card:hover .menuBtn { opacity: 1; }
 @media (hover: none) { .menuBtn { opacity: 1; background: rgba(0,0,0,0.35); } }
@@ -49,17 +46,16 @@
   display: flex; align-items: center; z-index: 2;
 }
 
-/* Nombre */
 .name {
   font-size: 12px; font-weight: 700;
   color: var(--text-primary);
   word-break: break-word;
   line-height: 1.3;
   position: relative; z-index: 2;
-  padding-right: 24px; /* espacio para menu btn */
+  padding-right: 24px;
 }
 
-/* Grid de preview */
+/* ── Grid de preview ─────────────────────────────────────────────────────── */
 .previewGrid {
   flex: 1;
   display: grid;
@@ -70,52 +66,92 @@
   min-height: 0;
 }
 .previewGrid.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
 }
-.emptyIcon { color: var(--text-secondary); opacity: 0.4; }
+.emptyIcon { color: var(--text-secondary); opacity: 0.35; }
 
-.previewCell {
+/* ── Mini counter card ───────────────────────────────────────────────────── */
+.miniCard {
+  border-radius: 7px;
   background: var(--log-card-bg);
   border: 1px solid var(--card-stroke);
-  border-radius: 6px;
-  padding: 4px 6px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 3px;
   overflow: hidden;
+  position: relative;
   min-height: 0;
 }
-.previewName {
-  font-size: 9px;
+.miniOverlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.22);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.miniName {
+  font-size: 8px;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  width: 100%; text-align: center;
+  position: relative; z-index: 1;
   line-height: 1.2;
 }
-.previewValue {
-  font-size: 14px;
-  font-weight: 700;
+.miniValue {
+  font-size: 16px; font-weight: 900;
   color: var(--text-primary);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1;
+  position: relative; z-index: 1;
+}
+.miniBtns {
+  display: flex; gap: 4px;
+  position: relative; z-index: 1;
+  width: 100%; justify-content: center;
+}
+.miniMinus, .miniPlus {
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.miniMinus {
+  background: var(--log-card-bg);
+  color: var(--btn-minus);
+  border: 1px solid var(--card-stroke);
+}
+.miniPlus {
+  background: var(--btn-plus);
+  color: var(--icon-on-brand);
 }
 
-/* Conteo centrado abajo */
+/* ── Mini folder card ────────────────────────────────────────────────────── */
+.miniFolderIcon {
+  color: var(--text-secondary);
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  flex: 1;
+}
+
+/* ── Overflow cell ───────────────────────────────────────────────────────── */
+.overflowCell {
+  border-radius: 7px;
+  background: var(--log-card-bg);
+  border: 1px solid var(--card-stroke);
+  display: flex; align-items: center; justify-content: center;
+}
+.overflowText {
+  font-size: 14px; font-weight: 700;
+  color: var(--text-secondary);
+}
+
+/* ── Count badge centrado abajo ──────────────────────────────────────────── */
 .countBar {
-  display: flex;
-  justify-content: center;
+  display: flex; justify-content: center;
   position: relative; z-index: 2;
 }
 .countBadge {
   background: var(--log-card-bg);
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 20px;
-  padding: 2px 10px;
+  font-size: 11px; font-weight: 600;
+  border-radius: 20px; padding: 2px 10px;
 }

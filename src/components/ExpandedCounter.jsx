@@ -8,8 +8,6 @@ import { uploadBackground as storageUpload, sharedCounterPath } from '../firebas
 import { uploadBackground as driveUploadBg, deleteBackground as driveDeleteBg } from '../firebase/driveManager'
 import useAppStore from '../store/appStore'
 
-const ROLE_BADGE = { owner: '👑', editor: '✏️', viewer: '👁️' }
-
 // URL base para compartir — los QR y los "Copiar enlace" apuntan aquí
 const INVITE_BASE = 'https://tosysy.github.io/countall-web/?code='
 const inviteUrl = (code) => INVITE_BASE + code
@@ -314,7 +312,6 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                   onBlur={saveName} onKeyDown={e => e.key === 'Enter' && saveName()} />
               ) : (
                 <button className={styles.heroName} onClick={() => canEdit && setEditingName(true)}>
-                  {counter.isShared && ROLE_BADGE[counter.role] && <span className={styles.roleBadge}>{ROLE_BADGE[counter.role]}</span>}
                   {counter.name}
                 </button>
               )}
@@ -351,9 +348,6 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
             {/* Nombre dentro de la tarjeta con gradiente superior */}
             <div className={styles.heroCardName}>
               <span>{counter.name}</span>
-              {counter.isShared && ROLE_BADGE[counter.role] && (
-                <span className={styles.roleBadge}>{ROLE_BADGE[counter.role]}</span>
-              )}
             </div>
 
             {/* Valor centrado */}

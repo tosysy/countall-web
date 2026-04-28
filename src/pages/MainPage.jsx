@@ -54,6 +54,9 @@ export default function MainPage() {
   const [dragKey, setDragKey] = useState(null)
   const [dragOverKey, setDragOverKey] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
+  // dragClone: { item, x, y, width, height } — clone flotante que sigue el puntero
+  const [dragClone, setDragClone] = useState(null)
+  const dragStateRef = useRef(null) // acceso sin stale closure en pointermove
   const [expandedShowMenu, setExpandedShowMenu] = useState(false)
   const [expandedInitialTab, setExpandedInitialTab] = useState('log')
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
@@ -433,16 +436,19 @@ export default function MainPage() {
   // ── Drag & Drop ──────────────────────────────────────────────────────────
   const getItemKey = (item) => `${item.type === 'counter' ? 'C' : 'F'}:${item.data.id}`
 
-  const resetDrag = () => { setDragKey(null); setDragOverKey(null); setDragOverFolder(null) }
+  const resetDrag = () => { setDragKey(null); setDragOverKey(null); setDragOverFolder(null); setDragClone(null); dragStateRef.current = null }
 
-  // Reordena items en vivo mientras se arrastra — muestra dónde caería el elemento
+  // ── Drag reorder helpers ──────────────────────────────────────────────────
+
+  // Reordena items en vivo mientras se arrastra
   const getLiveItems = (baseItems) => {
-    if (!dragKey || !dragOverKey || dragKey === dragOverKey) return baseItems
-    // No reordenar si el destino es una carpeta (es un drop "dentro")
-    const overItem = baseItems.find(i => getItemKey(i) === dragOverKey)
-    if (overItem?.type === 'folder' && dragKey.startsWith('C:')) return baseItems
-    const fromIdx = baseItems.findIndex(i => getItemKey(i) === dragKey)
-    const toIdx   = baseItems.findIndex(i => getItemKey(i) === dragOverKey)
+    const dk = dragStateRef.current?.dragKey
+    const dok = dragStateRef.current?.dragOverKey
+    if (!dk || !dok || dk === dok) return baseItems
+    const overItem = baseItems.find(i => getItemKey(i) === dok)
+    if (overItem?.type === 'folder' && dk.startsWith('C:')) return baseItems
+    const fromIdx = baseItems.findIndex(i => getItemKey(i) === dk)
+    const toIdx   = baseItems.findIndex(i => getItemKey(i) === dok)
     if (fromIdx === -1 || toIdx === -1) return baseItems
     const next = [...baseItems]
     const [moved] = next.splice(fromIdx, 1)
@@ -450,63 +456,92 @@ export default function MainPage() {
     return next
   }
 
-  const handleDragStart = (e, item) => {
-    setDragKey(getItemKey(item))
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e, item) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    const key = getItemKey(item)
-    setDragOverKey(key)
-    // Highlight folder if dragging a counter over it
-    if (item.type === 'folder' && dragKey?.startsWith('C:')) {
-      setDragOverFolder(item.data.id)
-    } else {
-      setDragOverFolder(null)
-    }
-  }
-
-  const handleDrop = (e, targetItem) => {
-    e.preventDefault()
-    if (!dragKey) { resetDrag(); return }
-    const targetKey = getItemKey(targetItem)
-
-    // Drop counter INTO a folder
-    if (targetItem.type === 'folder' && dragKey.startsWith('C:')) {
-      const counterId = dragKey.slice(2)
-      const sourceOrder = currentFolderId
-        ? [...(folderOrders[currentFolderId] ?? [])]
-        : [...gridOrder]
-      const newSourceOrder = sourceOrder.filter(k => k !== dragKey)
-      if (currentFolderId) setFolderOrder(currentFolderId, newSourceOrder)
-      else setGridOrder(newSourceOrder)
-      const targetFolderOrder = [...(folderOrders[targetItem.data.id] ?? [])]
-      if (!targetFolderOrder.includes(dragKey)) targetFolderOrder.push(dragKey)
-      setFolderOrder(targetItem.data.id, targetFolderOrder)
-      updateCounter(counterId, { folderId: targetItem.data.id })
-      resetDrag()
-      push()
-      return
-    }
-
-    // Reorder in current level
-    if (dragKey === targetKey) { resetDrag(); return }
+  const commitDrag = (finalDragKey, finalOverKey) => {
+    if (!finalDragKey || !finalOverKey || finalDragKey === finalOverKey) return
     const currentOrder = currentFolderId
       ? [...(folderOrders[currentFolderId] ?? [])]
       : [...gridOrder]
-    const fromIdx = currentOrder.indexOf(dragKey)
-    const toIdx = currentOrder.indexOf(targetKey)
-    if (fromIdx === -1 || toIdx === -1) { resetDrag(); return }
+    const fromIdx = currentOrder.indexOf(finalDragKey)
+    const toIdx   = currentOrder.indexOf(finalOverKey)
+    if (fromIdx === -1 || toIdx === -1) return
     const newOrder = [...currentOrder]
     newOrder.splice(fromIdx, 1)
-    newOrder.splice(toIdx, 0, dragKey)
+    newOrder.splice(toIdx, 0, finalDragKey)
     if (currentFolderId) setFolderOrder(currentFolderId, newOrder)
     else setGridOrder(newOrder)
-    resetDrag()
     push()
   }
+
+  // ── Pointer-based drag (funciona en móvil y escritorio) ───────────────────
+
+  const handleHandlePointerDown = (e, item) => {
+    if (!selectionMode) return
+    e.preventDefault()
+    e.stopPropagation()
+    const key = getItemKey(item)
+    // Buscar el grid-item contenedor
+    const gridEl = document.querySelector(`[data-drag-key="${key}"]`)
+    if (!gridEl) return
+    const rect = gridEl.getBoundingClientRect()
+    const state = {
+      dragKey: key,
+      dragOverKey: key,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    }
+    dragStateRef.current = state
+    setDragKey(key)
+    setDragOverKey(key)
+    setDragClone({ item, x: rect.left, y: rect.top, width: rect.width, height: rect.height })
+    // Capturar puntero para recibir eventos aunque salga del elemento
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+  }
+
+  const handleDragPointerMove = useCallback((e) => {
+    const state = dragStateRef.current
+    if (!state) return
+    const x = e.clientX - state.offsetX
+    const y = e.clientY - state.offsetY
+    setDragClone(prev => prev ? { ...prev, x, y } : null)
+
+    // Ocultar temporalmente el clone para hacer hit-test debajo de él
+    const cloneEl = document.getElementById('drag-clone-portal')
+    if (cloneEl) cloneEl.style.pointerEvents = 'none'
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const overCard = el?.closest('[data-drag-key]')
+    if (overCard) {
+      const overKey = overCard.getAttribute('data-drag-key')
+      if (overKey && overKey !== state.dragOverKey) {
+        state.dragOverKey = overKey
+        setDragOverKey(overKey)
+        // Forzar re-render para getLiveItems
+        setDragClone(prev => prev ? { ...prev } : null)
+      }
+    }
+  }, [])
+
+  const handleDragPointerUp = useCallback(() => {
+    const state = dragStateRef.current
+    if (!state) return
+    commitDrag(state.dragKey, state.dragOverKey)
+    dragStateRef.current = null
+    setDragKey(null)
+    setDragOverKey(null)
+    setDragClone(null)
+    setDragOverFolder(null)
+  }, [currentFolderId, folderOrders, gridOrder]) // eslint-disable-line
+
+  useEffect(() => {
+    if (!dragClone) return
+    document.addEventListener('pointermove', handleDragPointerMove)
+    document.addEventListener('pointerup',   handleDragPointerUp)
+    document.addEventListener('pointercancel', handleDragPointerUp)
+    return () => {
+      document.removeEventListener('pointermove', handleDragPointerMove)
+      document.removeEventListener('pointerup',   handleDragPointerUp)
+      document.removeEventListener('pointercancel', handleDragPointerUp)
+    }
+  }, [dragClone, handleDragPointerMove, handleDragPointerUp])
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
@@ -777,22 +812,18 @@ export default function MainPage() {
             const isFolderDropTarget = isFolder && dragOverFolder === item.data.id
             const isSelected = selectedKeys.has(key)
             const isDragging = dragKey === key
-            const isLandingSpot = !isDragging && dragKey && dragOverKey === key && !isFolderDropTarget
+            const isLandingSpot = !isDragging && !!dragKey && dragOverKey === key && !isFolderDropTarget
             return (
               <div key={key}
+                data-drag-key={key}
                 className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
-                draggable={selectionMode}
-                onDragStart={(e) => selectionMode && handleDragStart(e, item)}
-                onDragOver={(e) => selectionMode && handleDragOver(e, item)}
-                onDrop={(e) => selectionMode && handleDrop(e, item)}
-                onDragEnd={resetDrag}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
                 style={{
                   opacity: isDragging ? 0 : 1,
-                  transition: 'opacity 0.12s, transform 0.15s cubic-bezier(0.2,0,0,1)',
-                  transform: isLandingSpot ? 'scale(0.94)' : 'scale(1)',
+                  transition: dragKey ? 'opacity 0.12s, transform 0.18s cubic-bezier(0.2,0,0,1)' : undefined,
+                  transform: isLandingSpot ? 'scale(0.93)' : 'scale(1)',
                   position: 'relative',
                   animationDelay: dragKey ? '0ms' : `${idx * 35}ms`,
                 }}
@@ -823,7 +854,8 @@ export default function MainPage() {
                 {/* Overlay modo selección: drag handle izquierda, checkbox derecha */}
                 {selectionMode && (
                   <>
-                    <div className={styles.dragHandle}>
+                    <div className={styles.dragHandle}
+                      onPointerDown={(e) => handleHandlePointerDown(e, item)}>
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                         <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
                       </svg>
@@ -1314,6 +1346,45 @@ export default function MainPage() {
           </div>
         )
       })()}
+
+      {/* ── Clone flotante para drag ─────────────────────────────────────── */}
+      {dragClone && (
+        <div
+          id="drag-clone-portal"
+          style={{
+            position: 'fixed',
+            left: dragClone.x,
+            top: dragClone.y,
+            width: dragClone.width,
+            height: dragClone.height,
+            zIndex: 1000,
+            pointerEvents: 'none',
+            transform: 'scale(1.05)',
+            transformOrigin: 'center center',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.38)',
+            borderRadius: 16,
+            opacity: 0.96,
+            willChange: 'left, top',
+          }}
+        >
+          {dragClone.item.type === 'counter' ? (
+            <CounterCard
+              counter={dragClone.item.data}
+              onIncrement={undefined}
+              onDecrement={undefined}
+              onClick={undefined}
+            />
+          ) : (
+            <FolderCard
+              folder={dragClone.item.data}
+              folderCounters={getFolderCounters(dragClone.item.data.id)}
+              subFolders={folders.filter(f => f.parentFolderId === dragClone.item.data.id)}
+              folderOrder={folderOrders[dragClone.item.data.id] ?? []}
+              onClick={undefined}
+            />
+          )}
+        </div>
+      )}
 
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}

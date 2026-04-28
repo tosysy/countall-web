@@ -215,11 +215,24 @@ export default function App() {
   const tokenRefreshedRef = useRef(false) // evitar bucle si signInWithPopup dispara onAuthStateChanged
   const [rcConfig, setRcConfig] = useState({ maintenanceMode: false, maintenanceMessage: '', appBanner: '', appBannerColor: '#1E88E5' })
 
-  // ── Remote Config — fetch inicial + listener en tiempo real ─────────────
+  // ── App config / mantenimiento — listener RTDB, arranca siempre ─────────
+  // IMPORTANTE: en Firebase Console → Realtime Database → Rules añadir:
+  // "appConfig": { ".read": true, ".write": false }
+  // para que sea legible sin autenticación.
+  const rcUnsubRef = useRef(null)
   useEffect(() => {
+    // Intento inicial (puede fallar si las reglas requieren auth)
     initRemoteConfig().then(setRcConfig).catch(() => {})
-    const unsub = listenRemoteConfig(setRcConfig)
-    return () => unsub?.()
+    // Listener en tiempo real — se reintenta si falla
+    const startListener = () => {
+      rcUnsubRef.current?.()
+      rcUnsubRef.current = listenRemoteConfig(setRcConfig, () => {
+        // Error callback: reintenta tras 5 s (puede que auth no estuviera lista)
+        setTimeout(startListener, 5000)
+      })
+    }
+    startListener()
+    return () => rcUnsubRef.current?.()
   }, [])
 
   // ── Detectar ?code= en la URL (deep link de invitación) ──────────────────

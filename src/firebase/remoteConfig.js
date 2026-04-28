@@ -1,16 +1,15 @@
 /**
- * App config en tiempo real usando RTDB — igual que Android usa Remote Config
- * pero con respuesta instantánea gracias al listener onValue de RTDB.
+ * App config en tiempo real via RTDB.
  *
  * Estructura en Firebase RTDB:
  *   appConfig/
  *     maintenance_mode:    false
- *     maintenance_message: "La aplicación está en mantenimiento..."
+ *     maintenance_message: "..."
  *     app_banner:          ""
  *     app_banner_color:    "#1E88E5"
  *
- * Para activar mantenimiento: Firebase Console → Realtime Database →
- *   appConfig/maintenance_mode = true
+ * IMPORTANTE — Firebase Rules deben permitir lectura pública en appConfig:
+ *   "appConfig": { ".read": true, ".write": false }
  */
 import { ref, onValue, get } from 'firebase/database'
 import { db } from './config'
@@ -25,9 +24,10 @@ const DEFAULTS = {
 }
 
 function parseSnap(snap) {
+  if (!snap.exists()) return { ...DEFAULTS }
   const d = snap.val() ?? {}
   return {
-    maintenanceMode:    d.maintenance_mode    ?? DEFAULTS.maintenanceMode,
+    maintenanceMode:    d.maintenance_mode    === true,
     maintenanceMessage: d.maintenance_message ?? DEFAULTS.maintenanceMessage,
     appBanner:          d.app_banner          ?? DEFAULTS.appBanner,
     appBannerColor:     d.app_banner_color    ?? DEFAULTS.appBannerColor,
@@ -45,12 +45,16 @@ export async function initRemoteConfig() {
 }
 
 /**
- * Listener en tiempo real — llama a onChange(config) inmediatamente
- * y cada vez que cambia appConfig en RTDB.
- * Devuelve la función de unsuscripción.
+ * Listener en tiempo real.
+ * @param {function} onChange  - se llama con la config al arrancar y en cada cambio
+ * @param {function} onError   - se llama si el listener falla (ej: sin permiso)
+ * @returns función de unsuscripción
  */
-export function listenRemoteConfig(onChange) {
+export function listenRemoteConfig(onChange, onError) {
   const r = ref(db, CONFIG_PATH)
-  const unsub = onValue(r, (snap) => onChange(parseSnap(snap)), () => {})
-  return unsub
+  return onValue(
+    r,
+    (snap) => onChange(parseSnap(snap)),
+    (err) => { console.warn('appConfig listener error:', err); onError?.(err) }
+  )
 }

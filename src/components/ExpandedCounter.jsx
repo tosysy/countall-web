@@ -505,6 +505,20 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                       {counter.color ? counter.color.toUpperCase() : 'Sin color'}
                     </button>
                   </div>
+
+                  <p className={styles.settingLabel}>Imagen de fondo</p>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button className="btn-ghost" style={{ flex:1 }} onClick={handleBgImage}>
+                      {(counter.backgroundImageLocal || counter.backgroundImageUrl) ? 'Cambiar imagen' : 'Añadir imagen'}
+                    </button>
+                    {(counter.backgroundImageLocal || counter.backgroundImageUrl) && (
+                      <button className="btn-ghost" onClick={removeBg}>Quitar</button>
+                    )}
+                  </div>
+
+                  <button className="btn-ghost" style={{ width:'100%', marginTop: 4 }} onClick={handleReset}>
+                    Reiniciar contador
+                  </button>
                 </>
               )}
 
@@ -578,8 +592,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
         )}
       </div>
 
-      {/* ⋮ Dropdown — fuera del panel (no lo corta overflow:hidden) pero dentro
-          del backdrop (position:fixed inset:0) para que absolute == viewport */}
+      {/* ⋮ Dropdown — fuera del panel, dentro del backdrop full-screen */}
       {showMenu && (
         <div
           ref={menuDropRef}
@@ -599,30 +612,21 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
             transformOrigin: 'top right',
           }}
         >
+          {/* Editar → abre pestaña Ajustes */}
           {canEdit && (
             <button className="portal-menu-item" style={menuItemStyle}
-              onClick={() => { setShowMenu(false); handleBgImage() }}>
-              {(counter.backgroundImageLocal || counter.backgroundImageUrl) ? 'Cambiar imagen' : 'Imagen de fondo'}
+              onClick={() => { setShowMenu(false); setTab('settings') }}>
+              Editar
             </button>
           )}
-          {canEdit && (counter.backgroundImageLocal || counter.backgroundImageUrl) && (
-            <button className="portal-menu-item" style={menuItemStyle}
-              onClick={() => { setShowMenu(false); removeBg() }}>
-              Quitar imagen
-            </button>
-          )}
-          {canEdit && (
-            <button className="portal-menu-item" style={menuItemStyle}
-              onClick={() => { setShowMenu(false); setShowColorPicker(true) }}>
-              Color de fondo
-            </button>
-          )}
+          {/* Sacar de carpeta */}
           {counter.folderId && (
             <button className="portal-menu-item" style={menuItemStyle}
               onClick={() => { setShowMenu(false); onRemoveFromFolder?.() }}>
               Sacar de carpeta
             </button>
           )}
+          {/* Compartir / Dejar de compartir / Abandonar */}
           {!counter.isShared && isOwner && (
             <button className="portal-menu-item" style={menuItemStyle}
               onClick={handleShare} disabled={loading}>
@@ -635,24 +639,13 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               Dejar de compartir
             </button>
           )}
-          {counter.isShared && counter.role === 'viewer' && (
-            <button className="portal-menu-item" style={menuItemStyle}
-              onClick={handleRequestEdit} disabled={loading}>
-              Solicitar edición
-            </button>
-          )}
-          {canEdit && (
-            <button className="portal-menu-item" style={menuItemStyle}
-              onClick={handleReset}>
-              Reiniciar
-            </button>
-          )}
           {counter.isShared && !isOwner && (
             <button className="portal-menu-item" style={{ ...menuItemStyle, color: 'var(--danger)' }}
               onClick={handleAbandon} disabled={loading}>
               Abandonar
             </button>
           )}
+          {/* Eliminar */}
           {isOwner && (
             <button className="portal-menu-item" style={{ ...menuItemStyle, color: 'var(--danger)' }}
               onClick={() => { setShowMenu(false); onDelete() }}>

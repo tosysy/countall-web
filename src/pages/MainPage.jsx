@@ -1170,19 +1170,17 @@ export default function MainPage() {
         const ROLE_ICON  = { owner: '👑', editor: '✏️', viewer: '👁️' }
         return (
           <div className="dialog-backdrop" onClick={() => setSharedInfoSheet(null)}>
-            <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+            <div className="dialog" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
 
               {/* Nombre del contador */}
-              <h3 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>
-                {counter.name}
-              </h3>
+              <h3 style={{ margin: '0 0 16px' }}>{counter.name}</h3>
 
               {/* QR */}
               {qrUrl ? (
                 <img src={qrUrl} alt="QR"
-                  style={{ width: 120, height: 120, borderRadius: 20, margin: '0 auto 8px', display: 'block' }} />
+                  style={{ width: 120, height: 120, borderRadius: 20, margin: '0 auto 10px', display: 'block', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }} />
               ) : (
-                <div style={{ width: 120, height: 120, borderRadius: 20, margin: '0 auto 8px',
+                <div style={{ width: 120, height: 120, borderRadius: 20, margin: '0 auto 10px',
                   background: 'var(--log-card-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 8px', textAlign: 'center' }}>
                     {inviteCode === undefined ? 'Cargando…' : 'Solo el propietario puede ver el QR'}

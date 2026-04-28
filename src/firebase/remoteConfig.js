@@ -23,15 +23,25 @@ const DEFAULTS = {
   appBannerColor:     '#1E88E5',
 }
 
+// Acepta boolean true, string "true" o número 1
+function isTruthy(v) { return v === true || v === 'true' || v === 1 }
+
 function parseSnap(snap) {
-  if (!snap.exists()) return { ...DEFAULTS }
-  const d = snap.val() ?? {}
-  return {
-    maintenanceMode:    d.maintenance_mode    === true,
-    maintenanceMessage: d.maintenance_message ?? DEFAULTS.maintenanceMessage,
-    appBanner:          d.app_banner          ?? DEFAULTS.appBanner,
-    appBannerColor:     d.app_banner_color    ?? DEFAULTS.appBannerColor,
+  if (!snap.exists()) {
+    console.log('[appConfig] nodo no existe → usando defaults')
+    return { ...DEFAULTS }
   }
+  const d = snap.val() ?? {}
+  console.log('[appConfig] datos recibidos de RTDB:', d)
+  const cfg = {
+    // Acepta tanto maintenance_mode como maintenanceMode (por si el usuario usa camelCase)
+    maintenanceMode:    isTruthy(d.maintenance_mode) || isTruthy(d.maintenanceMode),
+    maintenanceMessage: d.maintenance_message ?? d.maintenanceMessage ?? DEFAULTS.maintenanceMessage,
+    appBanner:          d.app_banner          ?? d.appBanner          ?? DEFAULTS.appBanner,
+    appBannerColor:     d.app_banner_color    ?? d.appBannerColor     ?? DEFAULTS.appBannerColor,
+  }
+  console.log('[appConfig] config parseada:', cfg)
+  return cfg
 }
 
 /** Lectura única al arrancar. */
@@ -39,7 +49,8 @@ export async function initRemoteConfig() {
   try {
     const snap = await get(ref(db, CONFIG_PATH))
     return parseSnap(snap)
-  } catch {
+  } catch (e) {
+    console.warn('[appConfig] initRemoteConfig error:', e)
     return { ...DEFAULTS }
   }
 }
@@ -51,10 +62,17 @@ export async function initRemoteConfig() {
  * @returns función de unsuscripción
  */
 export function listenRemoteConfig(onChange, onError) {
+  console.log('[appConfig] iniciando listener RTDB en:', CONFIG_PATH)
   const r = ref(db, CONFIG_PATH)
   return onValue(
     r,
-    (snap) => onChange(parseSnap(snap)),
-    (err) => { console.warn('appConfig listener error:', err); onError?.(err) }
+    (snap) => {
+      console.log('[appConfig] onValue disparado, exists:', snap.exists())
+      onChange(parseSnap(snap))
+    },
+    (err) => {
+      console.warn('[appConfig] listener error:', err)
+      onError?.(err)
+    }
   )
 }

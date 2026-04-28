@@ -109,18 +109,18 @@
 
 /* ── Mini counter card ───────────────────────────────────────────────────── */
 .miniCard {
-  border-radius: 5px;
-  background: var(--log-card-bg);
+  border-radius: 8px;
+  background: var(--card-bg);
   border: 1px solid var(--card-stroke);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 3px 3px 2px;
+  padding: 4px 3px 4px;
   overflow: hidden;
   position: relative;
   min-height: 0;
   min-width: 0;
+  gap: 0;
 }
 .miniOverlay {
   position: absolute; inset: 0;
@@ -129,37 +129,38 @@
   pointer-events: none;
 }
 .miniName {
-  font-size: 7px;
+  font-size: 7px; font-weight: 700;
   color: var(--text-secondary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   width: 100%; text-align: center;
   position: relative; z-index: 1;
   line-height: 1.2;
   flex-shrink: 0;
+  padding: 0 2px;
 }
 .miniValue {
-  font-size: 13px; font-weight: 900;
+  font-size: 20px; font-weight: 900;
   color: var(--text-primary);
   line-height: 1;
+  letter-spacing: -1px;
   position: relative; z-index: 1;
   flex: 1;
   display: flex; align-items: center; justify-content: center;
 }
 .miniBtns {
-  display: flex; gap: 3px;
+  display: flex; gap: 4px;
   position: relative; z-index: 1;
-  width: 100%; justify-content: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 .miniMinus, .miniPlus {
-  width: 13px; height: 13px; border-radius: 50%;
+  width: 17px; height: 17px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
 .miniMinus {
-  background: var(--card-bg);
+  background: var(--bg);
   color: var(--btn-minus);
-  border: 1px solid var(--card-stroke);
 }
 .miniPlus {
   background: var(--btn-plus);

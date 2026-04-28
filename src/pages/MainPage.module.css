@@ -97,6 +97,8 @@
   position: relative;
   animation: cardEnter 0.35s cubic-bezier(0.34, 1.1, 0.64, 1) both;
 }
+.gridItem[draggable="true"] { cursor: grab; }
+.gridItem[draggable="true"]:active { cursor: grabbing; }
 .gridItemSelected > * { opacity: 0.75; }
 
 @keyframes cardEnter {
@@ -128,8 +130,9 @@
   width: 24px; height: 24px; border-radius: 6px;
   background: rgba(0,0,0,0.3); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  z-index: 10;
+  z-index: 10; cursor: grab;
 }
+.dragHandle:active { cursor: grabbing; }
 .checkbox {
   position: absolute; top: 8px; right: 8px;
   width: 22px; height: 22px; border-radius: 50%;

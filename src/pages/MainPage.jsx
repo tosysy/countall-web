@@ -764,10 +764,10 @@ export default function MainPage() {
             return (
               <div key={key}
                 className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
-                draggable={!selectionMode}
-                onDragStart={(e) => !selectionMode && handleDragStart(e, item)}
-                onDragOver={(e) => !selectionMode && handleDragOver(e, item)}
-                onDrop={(e) => !selectionMode && handleDrop(e, item)}
+                draggable={selectionMode}
+                onDragStart={(e) => selectionMode && handleDragStart(e, item)}
+                onDragOver={(e) => selectionMode && handleDragOver(e, item)}
+                onDrop={(e) => selectionMode && handleDrop(e, item)}
                 onDragEnd={resetDrag}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}

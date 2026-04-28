@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { onAuthChange, handleRedirectResult, getUsername, refreshDriveToken } from './firebase/auth'
 import { listenDataVersion, listenBgVersion, pullPersonalData, restoreLinkedSharedItems } from './firebase/syncManager'
 import { downloadAllBackgrounds } from './firebase/driveManager'
-import { initRemoteConfig } from './firebase/remoteConfig'
+import { initRemoteConfig, listenRemoteConfig } from './firebase/remoteConfig'
 import useAppStore from './store/appStore'
 import LoginPage from './pages/LoginPage'
 import MainPage from './pages/MainPage'
@@ -215,9 +215,11 @@ export default function App() {
   const tokenRefreshedRef = useRef(false) // evitar bucle si signInWithPopup dispara onAuthStateChanged
   const [rcConfig, setRcConfig] = useState({ maintenanceMode: false, maintenanceMessage: '', appBanner: '', appBannerColor: '#1E88E5' })
 
-  // ── Remote Config — fetch al arrancar ────────────────────────────────────
+  // ── Remote Config — fetch inicial + listener en tiempo real ─────────────
   useEffect(() => {
     initRemoteConfig().then(setRcConfig).catch(() => {})
+    const unsub = listenRemoteConfig(setRcConfig)
+    return () => unsub?.()
   }, [])
 
   // ── Detectar ?code= en la URL (deep link de invitación) ──────────────────

@@ -48,6 +48,7 @@ export default function MainPage() {
   const [newName, setNewName] = useState('')
   const [newIncrement, setNewIncrement] = useState('1')
   const [newTarget, setNewTarget] = useState('')
+  const [createErrors, setCreateErrors] = useState({}) // { name, increment, target }
   const [invBadge, setInvBadge] = useState(false)
   const [friendBadge, setFriendBadge] = useState(false)
   const [dragKey, setDragKey] = useState(null)
@@ -334,7 +335,18 @@ export default function MainPage() {
   }
 
   const handleCreateCounter = () => {
-    if (!newName.trim()) return
+    const errs = {}
+    if (!newName.trim()) errs.name = 'El nombre es obligatorio'
+    else if (newName.trim().length > 15) errs.name = 'Máximo 15 caracteres'
+    const incVal = parseInt(newIncrement)
+    if (!newIncrement || isNaN(incVal) || incVal < 1) errs.increment = 'Debe ser un número ≥ 1'
+    if (newTarget !== '') {
+      const tgtVal = parseInt(newTarget)
+      if (isNaN(tgtVal) || tgtVal < 1) errs.target = 'Debe ser un número ≥ 1'
+      else if (tgtVal <= incVal) errs.target = 'El objetivo debe ser mayor que el incremento'
+    }
+    if (Object.keys(errs).length > 0) { setCreateErrors(errs); return }
+    setCreateErrors({})
     saveHistory(`Antes de crear "${newName.trim()}"`)
     const inc = Math.max(1, parseInt(newIncrement) || 1)
     const tgt = newTarget !== '' ? Math.max(1, parseInt(newTarget) || 1) : null
@@ -350,7 +362,7 @@ export default function MainPage() {
       const cur = useAppStore.getState().folderOrders[currentFolderId] ?? []
       setFolderOrder(currentFolderId, [...cur, `C:${counter.id}`])
     }
-    setNewName(''); setNewIncrement('1'); setNewTarget(''); setShowCreateCounter(false)
+    setNewName(''); setNewIncrement('1'); setNewTarget(''); setCreateErrors({}); setShowCreateCounter(false)
     schedulePushPersonalData(
       useAppStore.getState().counters,
       useAppStore.getState().folders,
@@ -813,7 +825,7 @@ export default function MainPage() {
       {showFab && (
         <div className={styles.fabBackdrop} onClick={() => setShowFab(false)}>
           <div className={styles.fabMenu} onClick={e => e.stopPropagation()}>
-            <button className={styles.fabMenuItem} onClick={() => { setShowFab(false); setShowCreateCounter(true); setNewName('') }}>
+            <button className={styles.fabMenuItem} onClick={() => { setShowFab(false); setShowCreateCounter(true); setNewName(''); setNewIncrement('1'); setNewTarget(''); setCreateErrors({}) }}>
               <div className={styles.fabMenuIcon}>
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
                   <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
@@ -851,32 +863,62 @@ export default function MainPage() {
 
       {/* Create counter */}
       {showCreateCounter && (
-        <div className="dialog-backdrop" onClick={() => setShowCreateCounter(false)}>
+        <div className="dialog-backdrop" onClick={() => { setShowCreateCounter(false); setCreateErrors({}) }}>
           <div className="dialog" onClick={e => e.stopPropagation()}>
             <h3>Nuevo contador</h3>
-            <input className="input-field" placeholder="Nombre del contador"
-              value={newName} autoFocus
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreateCounter()} />
-            <div style={{ display:'flex', gap:'10px', marginTop:'10px' }}>
+
+            {/* Nombre */}
+            <div style={{ display:'flex', flexDirection:'column', gap:'4px', marginBottom: createErrors.name ? 2 : 10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <label style={{ fontSize:'12px', color:'var(--text-secondary)', fontWeight:600 }}>Nombre</label>
+                <span style={{ fontSize:'11px', color: newName.length > 12 ? 'var(--danger)' : 'var(--text-secondary)' }}>
+                  {newName.length}/15
+                </span>
+              </div>
+              <input className="input-field" placeholder="Nombre del contador"
+                value={newName} autoFocus maxLength={15}
+                style={ createErrors.name ? { borderColor:'var(--danger)' } : {}}
+                onChange={e => { setNewName(e.target.value); if (e.target.value.trim()) setCreateErrors(p => ({ ...p, name: undefined })) }}
+                onKeyDown={e => e.key === 'Enter' && handleCreateCounter()} />
+              {createErrors.name && (
+                <span style={{ fontSize:'11px', color:'var(--danger)', paddingLeft:2 }}>{createErrors.name}</span>
+              )}
+            </div>
+
+            {/* Incremento + Objetivo */}
+            <div style={{ display:'flex', gap:'10px' }}>
               <div style={{ flex:1, display:'flex', flexDirection:'column', gap:'4px' }}>
                 <label style={{ fontSize:'12px', color:'var(--text-secondary)', fontWeight:600 }}>Incremento</label>
                 <input className="input-field" type="number" inputMode="numeric" min="1" placeholder="1"
                   value={newIncrement}
-                  onChange={e => setNewIncrement(e.target.value)}
-                  onBlur={() => { const v = parseInt(newIncrement); setNewIncrement(String(isNaN(v) || v < 1 ? 1 : v)) }} />
+                  style={ createErrors.increment ? { borderColor:'var(--danger)' } : {}}
+                  onChange={e => { setNewIncrement(e.target.value); setCreateErrors(p => ({ ...p, increment: undefined })) }}
+                  onBlur={() => { const v = parseInt(newIncrement); if (!isNaN(v) && v >= 1) setNewIncrement(String(v)) }} />
+                {createErrors.increment && (
+                  <span style={{ fontSize:'11px', color:'var(--danger)', paddingLeft:2 }}>{createErrors.increment}</span>
+                )}
               </div>
               <div style={{ flex:1, display:'flex', flexDirection:'column', gap:'4px' }}>
-                <label style={{ fontSize:'12px', color:'var(--text-secondary)', fontWeight:600 }}>Objetivo <span style={{ fontWeight:400 }}>(opcional)</span></label>
+                <label style={{ fontSize:'12px', color:'var(--text-secondary)', fontWeight:600 }}>
+                  Objetivo <span style={{ fontWeight:400 }}>(opcional)</span>
+                </label>
                 <input className="input-field" type="number" inputMode="numeric" min="1" placeholder="Sin objetivo"
                   value={newTarget}
-                  onChange={e => setNewTarget(e.target.value)}
-                  onBlur={() => { if (newTarget !== '') { const v = parseInt(newTarget); setNewTarget(isNaN(v) || v < 1 ? '' : String(v)) } }} />
+                  style={ createErrors.target ? { borderColor:'var(--danger)' } : {}}
+                  onChange={e => { setNewTarget(e.target.value); setCreateErrors(p => ({ ...p, target: undefined })) }}
+                  onBlur={() => { if (newTarget !== '') { const v = parseInt(newTarget); if (isNaN(v) || v < 1) setNewTarget('') } }} />
+                {createErrors.target && (
+                  <span style={{ fontSize:'11px', color:'var(--danger)', paddingLeft:2 }}>{createErrors.target}</span>
+                )}
               </div>
             </div>
+
             <div style={{ display:'flex', gap:'8px', marginTop:'16px', justifyContent:'flex-end' }}>
-              <button className="btn-ghost" onClick={() => setShowCreateCounter(false)}>Cancelar</button>
-              <button className="btn-primary" onClick={handleCreateCounter}>Crear</button>
+              <button className="btn-ghost" onClick={() => { setShowCreateCounter(false); setCreateErrors({}) }}>Cancelar</button>
+              <button className="btn-primary" onClick={handleCreateCounter}
+                disabled={!newName.trim()}>
+                Crear
+              </button>
             </div>
           </div>
         </div>

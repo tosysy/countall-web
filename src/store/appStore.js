@@ -153,7 +153,7 @@ const useAppStore = create(
           countersSnapshot: JSON.stringify(s.counters),
           foldersSnapshot: JSON.stringify(s.folders),
         }
-        return { history: [entry, ...s.history].slice(0, 30) }
+        return { history: [entry, ...s.history].slice(0, 5) }
       }),
 
       restoreHistory: (id) => set(s => {
@@ -189,7 +189,7 @@ const useAppStore = create(
         folderOrders: s.folderOrders,
         theme: s.theme,
         username: s.username,
-        history: s.history,
+        history: (s.history ?? []).slice(0, 5),
         // Token de Drive persiste para que funcione tras recargas (válido 1h)
         driveToken: s.driveToken,
         driveTokenExpiry: s.driveTokenExpiry,

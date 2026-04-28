@@ -633,17 +633,28 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               {isOwner && (
                 <div className={styles.inviteBox}>
                   <h4>Invitar usuario</h4>
-                  {friends.length > 0 && (
-                    <datalist id="ec-friends-list">
-                      {friends
-                        .filter(f => !members.some(m => m.username === f.username))
-                        .map(f => <option key={f.uid} value={f.username} />)
-                      }
-                    </datalist>
-                  )}
                   <input className="input-field" placeholder="Nombre de usuario"
-                    list={friends.length > 0 ? 'ec-friends-list' : undefined}
                     value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} />
+                  {/* Chips de amigos */}
+                  {friends.length > 0 && (() => {
+                    const q = inviteUsername.toLowerCase()
+                    const visible = friends.filter(f =>
+                      !members.some(m => m.username === f.username) &&
+                      f.username !== inviteUsername &&
+                      (!q || f.username.toLowerCase().includes(q))
+                    )
+                    return visible.length > 0 ? (
+                      <div className={styles.friendChips}>
+                        {visible.map(f => (
+                          <button key={f.uid} className={styles.friendChip}
+                            onClick={() => setInviteUsername(f.username)}>
+                            <span className={styles.friendChipAvatar}>{f.username[0]?.toUpperCase()}</span>
+                            {f.username}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
                   <div className={styles.inviteRoleRow}>
                     <select className="input-field" value={inviteRole} onChange={e => setInviteRole(e.target.value)} style={{ flex:1 }}>
                       <option value="viewer">Solo ver</option>

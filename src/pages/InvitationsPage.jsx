@@ -272,20 +272,39 @@ export default function InvitationsPage() {
 
             {/* Usuario destino */}
             <p className={styles.sendLabel}>Usuario</p>
-            {friendSuggestions.length > 0 && (
-              <datalist id="inv-friends-list">
-                {friendSuggestions.map(u => <option key={u} value={u} />)}
-              </datalist>
-            )}
             <div className={styles.sendInputWrap}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ color:'var(--text-secondary)', flexShrink:0 }}>
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
               </svg>
               <input className={styles.sendInput} placeholder="Nombre de usuario"
-                list={friendSuggestions.length > 0 ? 'inv-friends-list' : undefined}
                 value={sendForm.toUsername}
                 onChange={e => setSendForm(f => ({ ...f, toUsername:e.target.value }))} />
+              {sendForm.toUsername && (
+                <button className={styles.searchClearBtn} onClick={() => setSendForm(f => ({ ...f, toUsername:'' }))}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
+              )}
             </div>
+            {/* Chips de amigos — filtra por lo que se escribe */}
+            {friendSuggestions.length > 0 && (() => {
+              const q = sendForm.toUsername.toLowerCase()
+              const visible = friendSuggestions.filter(u =>
+                u !== sendForm.toUsername && (!q || u.toLowerCase().includes(q))
+              )
+              return visible.length > 0 ? (
+                <div className={styles.friendChips}>
+                  {visible.map(u => (
+                    <button key={u} className={styles.friendChip}
+                      onClick={() => setSendForm(f => ({ ...f, toUsername: u }))}>
+                      <span className={styles.friendChipAvatar}>{u[0]?.toUpperCase()}</span>
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              ) : null
+            })()}
 
             {/* Rol */}
             <p className={styles.sendLabel}>Permisos</p>

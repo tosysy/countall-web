@@ -184,6 +184,34 @@
 }
 .sendInput::placeholder { color:var(--text-secondary); }
 
+/* Friend suggestion chips */
+.friendChips {
+  display:flex; flex-wrap:wrap; gap:6px;
+  margin-top:-2px;
+}
+.friendChip {
+  display:flex; align-items:center; gap:6px;
+  padding:6px 10px 6px 6px; border-radius:20px;
+  font-size:13px; font-weight:500; color:var(--text-primary);
+  background:var(--log-card-bg); border:1px solid var(--card-stroke);
+  transition:background 0.12s, border-color 0.12s;
+  white-space:nowrap;
+}
+.friendChip:hover { background:var(--card-bg); border-color:var(--text-secondary); }
+.friendChipAvatar {
+  width:22px; height:22px; border-radius:50%;
+  background:var(--btn-plus); color:var(--icon-on-brand);
+  font-size:11px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.searchClearBtn {
+  display:flex; align-items:center; padding:4px;
+  color:var(--text-secondary); border-radius:50%;
+  transition:background 0.1s; flex-shrink:0;
+}
+.searchClearBtn:hover { background:var(--log-card-bg); }
+
 /* Role picker */
 .rolePicker { display:flex; gap:8px; }
 .roleChip {

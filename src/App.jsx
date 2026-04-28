@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { onAuthChange, handleRedirectResult, getUsername, refreshDriveToken } from './firebase/auth'
 import { listenDataVersion, listenBgVersion, pullPersonalData, restoreLinkedSharedItems } from './firebase/syncManager'
 import { downloadAllBackgrounds } from './firebase/driveManager'
-import { initRemoteConfig, listenRemoteConfig } from './firebase/remoteConfig'
+import { listenRemoteConfig } from './firebase/remoteConfig'
 import useAppStore from './store/appStore'
 import LoginPage from './pages/LoginPage'
 import MainPage from './pages/MainPage'
@@ -221,17 +221,9 @@ export default function App() {
   // para que sea legible sin autenticación.
   const rcUnsubRef = useRef(null)
   useEffect(() => {
-    // Intento inicial (puede fallar si las reglas requieren auth)
-    initRemoteConfig().then(setRcConfig).catch(() => {})
-    // Listener en tiempo real — se reintenta si falla
-    const startListener = () => {
-      rcUnsubRef.current?.()
-      rcUnsubRef.current = listenRemoteConfig(setRcConfig, () => {
-        // Error callback: reintenta tras 5 s (puede que auth no estuviera lista)
-        setTimeout(startListener, 5000)
-      })
-    }
-    startListener()
+    // listenRemoteConfig hace el fetch inicial y luego polling cada 15 s.
+    // Si falla (sin red, etc.) reintenta en el siguiente ciclo automáticamente.
+    rcUnsubRef.current = listenRemoteConfig(setRcConfig, () => {})
     return () => rcUnsubRef.current?.()
   }, [])
 

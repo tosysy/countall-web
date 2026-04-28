@@ -1,20 +1,18 @@
 /**
- * App config en tiempo real via RTDB.
+ * App config via Firebase Remote Config.
+ * Android usa el listener en tiempo real nativo del SDK Android.
+ * Web no tiene ese listener, así que hace polling cada POLL_INTERVAL ms.
  *
- * Estructura en Firebase RTDB:
- *   appConfig/
- *     maintenance_mode:    false
- *     maintenance_message: "..."
- *     app_banner:          ""
- *     app_banner_color:    "#1E88E5"
- *
- * IMPORTANTE — Firebase Rules deben permitir lectura pública en appConfig:
- *   "appConfig": { ".read": true, ".write": false }
+ * Parámetros en Remote Config (mismos que en Android):
+ *   maintenance_mode    Boolean  false
+ *   maintenance_message String   "La aplicación está en mantenimiento..."
+ *   app_banner          String   ""
+ *   app_banner_color    String   "#1E88E5"
  */
-import { ref, onValue, get } from 'firebase/database'
-import { db } from './config'
+import { getRemoteConfig, fetchAndActivate, getValue } from 'firebase/remote-config'
+import app from './config'
 
-const CONFIG_PATH = 'appConfig'
+const POLL_INTERVAL = 15_000 // 15 segundos — sin recargar y sin Cloud Functions
 
 const DEFAULTS = {
   maintenanceMode:    false,
@@ -23,56 +21,69 @@ const DEFAULTS = {
   appBannerColor:     '#1E88E5',
 }
 
-// Acepta boolean true, string "true" o número 1
-function isTruthy(v) { return v === true || v === 'true' || v === 1 }
-
-function parseSnap(snap) {
-  if (!snap.exists()) {
-    console.log('[appConfig] nodo no existe → usando defaults')
-    return { ...DEFAULTS }
+let _rc = null
+function getRC() {
+  if (!_rc) {
+    _rc = getRemoteConfig(app)
+    _rc.settings.minimumFetchIntervalMillis = POLL_INTERVAL
+    _rc.defaultConfig = {
+      maintenance_mode:    false,
+      maintenance_message: DEFAULTS.maintenanceMessage,
+      app_banner:          '',
+      app_banner_color:    '#1E88E5',
+    }
   }
-  const d = snap.val() ?? {}
-  console.log('[appConfig] datos recibidos de RTDB:', d)
-  const cfg = {
-    // Acepta tanto maintenance_mode como maintenanceMode (por si el usuario usa camelCase)
-    maintenanceMode:    isTruthy(d.maintenance_mode) || isTruthy(d.maintenanceMode),
-    maintenanceMessage: d.maintenance_message ?? d.maintenanceMessage ?? DEFAULTS.maintenanceMessage,
-    appBanner:          d.app_banner          ?? d.appBanner          ?? DEFAULTS.appBanner,
-    appBannerColor:     d.app_banner_color    ?? d.appBannerColor     ?? DEFAULTS.appBannerColor,
-  }
-  console.log('[appConfig] config parseada:', cfg)
-  return cfg
+  return _rc
 }
 
-/** Lectura única al arrancar. */
+function readActive() {
+  const rc = getRC()
+  return {
+    maintenanceMode:    getValue(rc, 'maintenance_mode').asBoolean(),
+    maintenanceMessage: getValue(rc, 'maintenance_message').asString() || DEFAULTS.maintenanceMessage,
+    appBanner:          getValue(rc, 'app_banner').asString(),
+    appBannerColor:     getValue(rc, 'app_banner_color').asString() || DEFAULTS.appBannerColor,
+  }
+}
+
+/** Fetch inicial al arrancar. */
 export async function initRemoteConfig() {
   try {
-    const snap = await get(ref(db, CONFIG_PATH))
-    return parseSnap(snap)
-  } catch (e) {
-    console.warn('[appConfig] initRemoteConfig error:', e)
+    await fetchAndActivate(getRC())
+    return readActive()
+  } catch {
     return { ...DEFAULTS }
   }
 }
 
 /**
- * Listener en tiempo real.
- * @param {function} onChange  - se llama con la config al arrancar y en cada cambio
- * @param {function} onError   - se llama si el listener falla (ej: sin permiso)
- * @returns función de unsuscripción
+ * Polling cada POLL_INTERVAL ms.
+ * Llama a onChange inmediatamente y luego en cada comprobación.
+ * @returns función para detener el polling
  */
 export function listenRemoteConfig(onChange, onError) {
-  console.log('[appConfig] iniciando listener RTDB en:', CONFIG_PATH)
-  const r = ref(db, CONFIG_PATH)
-  return onValue(
-    r,
-    (snap) => {
-      console.log('[appConfig] onValue disparado, exists:', snap.exists())
-      onChange(parseSnap(snap))
-    },
-    (err) => {
-      console.warn('[appConfig] listener error:', err)
-      onError?.(err)
+  const rc = getRC()
+  let stopped = false
+
+  const poll = async () => {
+    if (stopped) return
+    try {
+      await fetchAndActivate(rc)
+      onChange(readActive())
+    } catch (e) {
+      console.warn('[remoteConfig] fetch error:', e)
+      onError?.(e)
     }
-  )
+  }
+
+  // Primera llamada inmediata
+  poll()
+
+  // Polling continuo
+  const timer = setInterval(poll, POLL_INTERVAL)
+
+  return () => {
+    stopped = true
+    clearInterval(timer)
+  }
 }

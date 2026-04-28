@@ -114,11 +114,16 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
       {/* Valor centrado */}
       <div className={styles.content}>
         {goalReached ? <span className={styles.trophy}>🏆</span> : null}
-        <p className={styles.value} style={goalReached ? { color: '#52CF48' } : (bg || cardColor ? { color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,0.45)' } : {})}>
-          {counter.isCompetitive
+        {(() => {
+          const displayValue = counter.isCompetitive
             ? Object.values(counter.competitorScores ?? {}).reduce((a, b) => a + b, 0)
-            : counter.value}
-        </p>
+            : counter.value
+          return (
+            <p key={displayValue} className={styles.value} style={goalReached ? { color: '#52CF48' } : (bg || cardColor ? { color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,0.45)' } : {})}>
+              {displayValue}
+            </p>
+          )
+        })()}
         {hasTarget && !counter.isCompetitive && (
           <p className={styles.target} style={bg || cardColor ? { color: 'rgba(255,255,255,0.7)' } : {}}>
             / {counter.target}

@@ -734,8 +734,8 @@ export default function MainPage() {
           <p>Pulsa + para crear tu primer contador</p>
         </div>
       ) : (
-        <div className="counter-grid">
-          {items.map((item) => {
+        <div key={currentFolderId ?? 'root'} className="counter-grid">
+          {items.map((item, idx) => {
             const key = getItemKey(item)
             const isFolder = item.type === 'folder'
             const isFolderDropTarget = isFolder && dragOverFolder === item.data.id
@@ -751,7 +751,7 @@ export default function MainPage() {
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
-                style={{ opacity: dragKey === key ? 0.45 : 1, transition: 'opacity 0.15s', position: 'relative' }}
+                style={{ opacity: dragKey === key ? 0.45 : 1, transition: 'opacity 0.15s', position: 'relative', animationDelay: `${idx * 35}ms` }}
               >
                 {item.type === 'counter' ? (
                   <CounterCard

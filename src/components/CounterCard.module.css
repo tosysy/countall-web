@@ -109,6 +109,11 @@
   color: var(--text-primary);
   line-height: 1;
   letter-spacing: -2px;
+  animation: valuePop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes valuePop {
+  0%   { transform: scale(1.35); }
+  100% { transform: scale(1); }
 }
 
 .target {
@@ -144,4 +149,4 @@
 }
 .btnMinus:hover { opacity: 0.8; }
 .btnPlus:hover { opacity: 0.85; }
-.btnMinus:active, .btnPlus:active { transform: scale(0.93); }
+.btnMinus:active, .btnPlus:active { transform: scale(0.88); transition: transform 0.07s; }

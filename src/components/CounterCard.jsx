@@ -16,7 +16,6 @@ function progressColor(pct) {
   return lerpColor('#FFC107','#52CF48', (pct - 0.5) * 2)
 }
 
-// Luminancia relativa para elegir color de texto legible
 function luminance(hex) {
   if (!hex || !hex.startsWith('#') || hex.length < 7) return 0.5
   const r = parseInt(hex.slice(1,3),16)/255
@@ -28,7 +27,7 @@ function luminance(hex) {
 export default function CounterCard({ counter, onIncrement, onDecrement, onClick, onMenu, onSharedBadge }) {
   const longPressTimer = useRef(null)
   const longPressInterval = useRef(null)
-  const [pressing, setPressing] = useState(null) // 'plus' | 'minus'
+  const [pressing, setPressing] = useState(null)
 
   const startLongPress = (type) => {
     setPressing(type)
@@ -53,22 +52,24 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
 
   const pct = hasTarget ? Math.min(1, counter.value / counter.target) : 0
   const progColor = hasTarget ? progressColor(pct) : null
-
   const outerStyle = hasTarget ? { '--prog': pct, '--prog-color': progColor } : {}
 
-  // Estilos automáticos de botones según fondo (igual que Android)
-  // Con imagen: ambos botones blancos opacos
-  // Con color: − blanco, + usa el color del contador con texto contrastante
   const btnMinusStyle = (bg || cardColor) ? { background: '#ffffff', color: '#333', border: 'none' } : {}
   const btnPlusStyle = cardColor
     ? { background: cardColor, color: luminance(cardColor) > 0.55 ? '#333' : '#fff', border: 'none' }
     : bg ? { background: '#ffffff', color: '#333', border: 'none' } : {}
 
+  // El click en el outer solo abre el contador si NO viene de un botón hijo
+  const handleOuterClick = (e) => {
+    if (e.target.closest('button')) return
+    onClick?.(counter)
+  }
+
   return (
     <div
       className={`${styles.cardOuter} ${hasTarget ? styles.cardOuterProgress : ''} ${goalReached ? styles.goalReached : ''}`}
       style={outerStyle}
-      onClick={() => onClick?.(counter)}
+      onClick={handleOuterClick}
     >
     <div
       className={styles.card}
@@ -78,13 +79,12 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
         backgroundSize: 'cover', backgroundPosition: 'center',
       }}
     >
-      {/* Overlay para texto legible sobre fondo de imagen */}
       {(bg || cardColor) && <div className={styles.overlay} />}
 
       {/* Botón menú 3 puntos */}
       {onMenu && (
         <button className={styles.menuBtn}
-          onPointerDown={e => { e.stopPropagation(); onMenu(counter, e) }}
+          onClick={e => { e.stopPropagation(); onMenu(counter, e) }}
           style={(bg || cardColor) ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}
         >
           <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
@@ -93,13 +93,12 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
         </button>
       )}
 
-      {/* Indicador compartido */}
+      {/* Badge compartido — botón que abre la hoja de info */}
       {counter.isShared && (
         <button
           className={styles.sharedBadge}
           title={`Compartido · ${counter.role}`}
-          onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onSharedBadge?.(counter) }}
+          onClick={() => onSharedBadge?.(counter)}
         >
           <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
             <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
@@ -114,16 +113,12 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
 
       {/* Valor centrado */}
       <div className={styles.content}>
-        {goalReached
-          ? <span className={styles.trophy}>🏆</span>
-          : null
-        }
+        {goalReached ? <span className={styles.trophy}>🏆</span> : null}
         <p className={styles.value} style={goalReached ? { color: '#52CF48' } : (bg || cardColor ? { color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,0.45)' } : {})}>
           {counter.isCompetitive
             ? Object.values(counter.competitorScores ?? {}).reduce((a, b) => a + b, 0)
             : counter.value}
         </p>
-
         {hasTarget && !counter.isCompetitive && (
           <p className={styles.target} style={bg || cardColor ? { color: 'rgba(255,255,255,0.7)' } : {}}>
             / {counter.target}
@@ -131,11 +126,11 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
         )}
       </div>
 
-      <div className={styles.buttons} onClick={e => e.stopPropagation()}>
+      <div className={styles.buttons}>
         <button
           className={styles.btnMinus}
           style={btnMinusStyle}
-          onPointerDown={() => { onDecrement?.(); startLongPress('minus') }}
+          onPointerDown={e => { e.stopPropagation(); onDecrement?.(); startLongPress('minus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
@@ -143,7 +138,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
         <button
           className={styles.btnPlus}
           style={btnPlusStyle}
-          onPointerDown={() => { onIncrement?.(); startLongPress('plus') }}
+          onPointerDown={e => { e.stopPropagation(); onIncrement?.(); startLongPress('plus') }}
           onPointerUp={endLongPress} onPointerLeave={endLongPress}
         >
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>

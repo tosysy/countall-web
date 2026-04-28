@@ -543,9 +543,18 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                       <div className={styles.settingCardIcon}>
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                       </div>
-                      <span className={styles.settingCardLabel}>Incremento</span>
+                      <div style={{ flex:1, display:'flex', flexDirection:'column', gap:2 }}>
+                        <span className={styles.settingCardLabel}>Incremento</span>
+                        {counter.value !== 0 && (
+                          <span style={{ fontSize:11, color:'var(--text-secondary)', lineHeight:1.3 }}>
+                            Reinicia a 0 para cambiarlo
+                          </span>
+                        )}
+                      </div>
                       <input className={styles.settingCardInput} type="number" inputMode="numeric" min="1"
                         value={incrementInput}
+                        disabled={counter.value !== 0}
+                        style={ counter.value !== 0 ? { opacity:0.35, pointerEvents:'none' } : {}}
                         onChange={e => setIncrementInput(e.target.value)}
                         onBlur={() => { const v = parseInt(incrementInput); setIncrementInput(String(isNaN(v)||v<1?1:v)) }} />
                     </div>

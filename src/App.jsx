@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { onAuthChange, handleRedirectResult, getUsername, refreshDriveToken } from './firebase/auth'
 import { listenDataVersion, listenBgVersion, pullPersonalData, restoreLinkedSharedItems } from './firebase/syncManager'
 import { downloadAllBackgrounds } from './firebase/driveManager'
+import { initRemoteConfig } from './firebase/remoteConfig'
 import useAppStore from './store/appStore'
 import LoginPage from './pages/LoginPage'
 import MainPage from './pages/MainPage'
@@ -38,6 +39,60 @@ function OfflineBanner() {
         <line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
       </svg>
       Sin conexión — los cambios se guardarán en local
+    </div>
+  )
+}
+
+/** Pantalla de mantenimiento — bloquea toda la UI igual que en Android */
+function MaintenanceScreen({ message }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 99999,
+      background: 'var(--bg)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 20, padding: 32, textAlign: 'center',
+    }}>
+      <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+      <p style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+        En mantenimiento
+      </p>
+      <p style={{ fontSize: 15, color: 'var(--text-secondary)', maxWidth: 300, margin: 0, lineHeight: 1.5 }}>
+        {message}
+      </p>
+    </div>
+  )
+}
+
+/** Banner de aviso en la parte superior — dismiss con ✕ */
+function AppBanner({ text, color }) {
+  const [dismissed, setDismissed] = useState(false)
+  if (dismissed || !text) return null
+  // Calcular si el texto sobre el color es legible en blanco o negro
+  const r = parseInt(color.slice(1,3),16)/255, g = parseInt(color.slice(3,5),16)/255, b = parseInt(color.slice(5,7),16)/255
+  const lum = 0.299*r + 0.587*g + 0.114*b
+  const textColor = lum > 0.55 ? '#000' : '#fff'
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9990,
+      background: color, color: textColor,
+      padding: 'max(10px, env(safe-area-inset-top) + 4px) 16px 10px',
+      display: 'flex', alignItems: 'center', gap: 10,
+      fontSize: 13, fontWeight: 600,
+      boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+      animation: 'slideDown 0.25s ease',
+    }}>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ flexShrink: 0 }}>
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+      </svg>
+      <span style={{ flex: 1 }}>{text}</span>
+      <button onClick={() => setDismissed(true)} style={{ color: textColor, opacity: 0.8, padding: 4, lineHeight: 0 }}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </button>
     </div>
   )
 }
@@ -158,6 +213,12 @@ export default function App() {
   const { setUser, setUsername, setDriveToken, updateCounter, clearData } = useAppStore()
   const pendingCodeRef = useRef(null)
   const tokenRefreshedRef = useRef(false) // evitar bucle si signInWithPopup dispara onAuthStateChanged
+  const [rcConfig, setRcConfig] = useState({ maintenanceMode: false, maintenanceMessage: '', appBanner: '', appBannerColor: '#1E88E5' })
+
+  // ── Remote Config — fetch al arrancar ────────────────────────────────────
+  useEffect(() => {
+    initRemoteConfig().then(setRcConfig).catch(() => {})
+  }, [])
 
   // ── Detectar ?code= en la URL (deep link de invitación) ──────────────────
   useEffect(() => {
@@ -292,6 +353,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <div className="app">
+        {rcConfig.maintenanceMode && <MaintenanceScreen message={rcConfig.maintenanceMessage} />}
+        {!rcConfig.maintenanceMode && rcConfig.appBanner && <AppBanner text={rcConfig.appBanner} color={rcConfig.appBannerColor} />}
         <OfflineBanner />
         <Routes>
           <Route path="/login" element={<LoginPage onDriveToken={(t) => {

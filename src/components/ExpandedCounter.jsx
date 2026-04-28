@@ -67,6 +67,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
   const [inviteUsername, setInviteUsername] = useState('')
   const [inviteRole, setInviteRole]     = useState('viewer')
   const [inviteCode, setInviteCode]     = useState(null)
+  const [roleDropUid, setRoleDropUid]   = useState(null) // uid whose role dropdown is open
 
   // Misc
   const [loading, setLoading]   = useState(false)
@@ -101,6 +102,13 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [showMenu])
+
+  useEffect(() => {
+    if (!roleDropUid) return
+    const h = (e) => { if (!e.target.closest('[data-role-drop]')) setRoleDropUid(null) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [roleDropUid])
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const showMsg = (text, error = false) => { setMsg({ text, error }); setTimeout(() => setMsg(null), 3000) }
@@ -655,43 +663,80 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                       </div>
                     ) : null
                   })()}
+                  {/* Selector de rol personalizado */}
                   <div className={styles.inviteRoleRow}>
-                    <select className="input-field" value={inviteRole} onChange={e => setInviteRole(e.target.value)} style={{ flex:1 }}>
-                      <option value="viewer">Solo ver</option>
-                      <option value="editor">Editor</option>
-                    </select>
-                    <button className="btn-primary" onClick={handleInvite} disabled={loading}>Invitar</button>
+                    <div className={styles.roleChips}>
+                      {[
+                        { id:'viewer', label:'Solo ver',  icon:<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg> },
+                        { id:'editor', label:'Editor',    icon:<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> },
+                      ].map(r => (
+                        <button key={r.id}
+                          className={`${styles.roleChip} ${inviteRole === r.id ? styles.roleChipActive : ''}`}
+                          onClick={() => setInviteRole(r.id)}>
+                          {r.icon}{r.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button className="btn-primary" onClick={handleInvite} disabled={loading || !inviteUsername.trim()}>Invitar</button>
                   </div>
                 </div>
               )}
-              {members.map(m => (
-                <div key={m.uid} className={styles.memberRow}>
-                  <div className="avatar" style={{ background: '#607D8B' }}>
-                    {m.username?.[0]?.toUpperCase() ?? '?'}
+
+              {/* Lista de miembros */}
+              {members.map(m => {
+                const AVATAR_COLORS = ['#5C6BC0','#26A69A','#66BB6A','#EC407A','#FFA726','#42A5F5','#8D6E63','#78909C']
+                let h = 0; for (const c of (m.username ?? '')) h = (h * 31 + c.charCodeAt(0)) >>> 0
+                const avatarColor = AVATAR_COLORS[h % AVATAR_COLORS.length]
+                const roleLabels = { owner:'Propietario', editor:'Editor', viewer:'Solo ver' }
+                const canManage = isOwner && m.uid !== user?.uid && m.role !== 'owner'
+                const isDropOpen = roleDropUid === m.uid
+                return (
+                  <div key={m.uid} className={styles.memberRow}>
+                    <div className={styles.memberAvatar} style={{ background: avatarColor }}>
+                      {m.username?.[0]?.toUpperCase() ?? '?'}
+                    </div>
+                    <div className={styles.memberInfo}>
+                      <span className={styles.memberName}>{m.username}</span>
+                    </div>
+                    {/* Role pill — abre dropdown si es owner */}
+                    <div className={styles.rolePillWrap} data-role-drop>
+                      <button
+                        className={`${styles.rolePill} ${m.role === 'owner' ? styles.rolePillOwner : m.role === 'editor' ? styles.rolePillEditor : styles.rolePillViewer}`}
+                        onClick={() => canManage ? setRoleDropUid(isDropOpen ? null : m.uid) : null}
+                        style={{ cursor: canManage ? 'pointer' : 'default' }}>
+                        {m.role === 'owner' && '👑 '}
+                        {roleLabels[m.role] ?? m.role}
+                        {canManage && (
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style={{ marginLeft:3, opacity:0.7 }}>
+                            <path d="M7 10l5 5 5-5z"/>
+                          </svg>
+                        )}
+                      </button>
+                      {canManage && isDropOpen && (
+                        <div className={styles.roleDropdown}>
+                          {[
+                            { id:'viewer', label:'Solo ver', icon:<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg> },
+                            { id:'editor', label:'Editor',   icon:<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> },
+                          ].map(r => (
+                            <button key={r.id}
+                              className={`${styles.roleDropItem} ${m.role === r.id ? styles.roleDropItemActive : ''}`}
+                              onClick={async () => { setRoleDropUid(null); await setMemberRole(counter.sharedId, m.uid, r.id); loadMembers() }}>
+                              {r.icon}{r.label}
+                              {m.role === r.id && <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginLeft:'auto' }}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>}
+                            </button>
+                          ))}
+                          <div className={styles.roleDropDivider} />
+                          <button className={`${styles.roleDropItem} ${styles.roleDropItemDanger}`}
+                            onClick={async () => { setRoleDropUid(null); await removeMember(counter.sharedId, m.uid); loadMembers() }}>
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M14 8c0-2.21-1.79-4-4-4S6 5.79 6 8s1.79 4 4 4 4-1.79 4-4zm3 2v2h6v-2h-6zM2 18v2h16v-2c0-2.66-5.33-4-8-4s-8 1.34-8 4z"/></svg>
+                            Eliminar miembro
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className={styles.memberInfo}>
-                    <span className={styles.memberName}>{m.username}</span>
-                    {isOwner && m.uid !== user?.uid ? (
-                      <select className={styles.roleSelect} value={m.role}
-                        onChange={async e => { await setMemberRole(counter.sharedId, m.uid, e.target.value); loadMembers() }}>
-                        <option value="viewer">Solo ver</option>
-                        <option value="editor">Editor</option>
-                      </select>
-                    ) : (
-                      <span className={styles.memberRole}>
-                        {{ owner:'Propietario', editor:'Editor', viewer:'Lector' }[m.role] ?? m.role}
-                      </span>
-                    )}
-                  </div>
-                  {isOwner && m.uid !== user?.uid && (
-                    <button className="btn-icon" onClick={async () => { await removeMember(counter.sharedId, m.uid); loadMembers() }}>
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--danger)" strokeWidth="2">
-                        <path d="M18 6L6 18M6 6l12 12"/>
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

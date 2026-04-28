@@ -392,6 +392,24 @@
 .inviteBox { background: var(--log-card-bg); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .inviteBox h4 { font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .inviteRoleRow { display: flex; gap: 8px; align-items: center; }
+
+/* Role chip pair (invite box) */
+.roleChips { display:flex; gap:6px; flex:1; }
+.roleChip {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  padding:9px 8px; border-radius:10px;
+  font-size:12px; font-weight:600;
+  border:1.5px solid var(--card-stroke);
+  color:var(--text-secondary); background:var(--card-bg);
+  transition:all 0.15s;
+}
+.roleChip:hover { border-color:var(--text-secondary); }
+.roleChipActive {
+  background:var(--btn-plus); color:var(--icon-on-brand);
+  border-color:transparent;
+}
+
+/* Friend suggestion chips */
 .friendChips { display:flex; flex-wrap:wrap; gap:6px; margin-top:-2px; }
 .friendChip {
   display:flex; align-items:center; gap:6px;
@@ -407,12 +425,55 @@
   font-size:10px; font-weight:700;
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
 }
-.memberRow { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--card-stroke); }
-.memberRow:last-child { border: none; }
-.memberInfo { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.memberName { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-.memberRole { font-size: 12px; color: var(--text-secondary); }
-.roleSelect { font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-family: inherit; }
+
+/* Member row */
+.memberRow {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 0; border-bottom:1px solid var(--card-stroke);
+}
+.memberRow:last-child { border:none; }
+.memberAvatar {
+  width:40px; height:40px; border-radius:20px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:700; color:#fff;
+}
+.memberInfo { flex:1; min-width:0; }
+.memberName { font-size:14px; font-weight:600; color:var(--text-primary); }
+
+/* Role pill */
+.rolePillWrap { position:relative; flex-shrink:0; }
+.rolePill {
+  display:flex; align-items:center; gap:3px;
+  padding:5px 10px; border-radius:20px;
+  font-size:12px; font-weight:600;
+  transition:opacity 0.15s;
+}
+.rolePill:hover { opacity:0.8; }
+.rolePillOwner  { background:rgba(255,193,7,0.15);  color:#F9A825; }
+.rolePillEditor { background:rgba(33,150,243,0.12); color:#1E88E5; }
+.rolePillViewer { background:var(--log-card-bg);    color:var(--text-secondary); border:1px solid var(--card-stroke); }
+
+/* Role dropdown */
+.roleDropdown {
+  position:absolute; right:0; top:calc(100% + 6px); z-index:120;
+  background:var(--card-bg); border:1px solid var(--card-stroke);
+  border-radius:14px; min-width:160px;
+  box-shadow:0 8px 28px rgba(0,0,0,0.22);
+  overflow:hidden;
+  animation:scaleIn 0.13s ease;
+  transform-origin:top right;
+}
+.roleDropItem {
+  display:flex; align-items:center; gap:9px;
+  width:100%; padding:11px 14px;
+  font-size:13px; font-weight:500; color:var(--text-primary);
+  text-align:left; transition:background 0.1s;
+}
+.roleDropItem:hover { background:var(--log-card-bg); }
+.roleDropItemActive { font-weight:700; }
+.roleDropDivider { height:1px; background:var(--card-stroke); margin:2px 0; }
+.roleDropItemDanger { color:var(--danger); }
+.roleDropItemDanger:hover { background:rgba(239,83,80,0.08); }
 
 /* ── Setting button (imagen / reiniciar) ─────────────────────────────────── */
 .settingBtn {

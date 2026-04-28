@@ -504,12 +504,13 @@ export default function MainPage() {
   )
 
   const openSharedInfo = async (counter) => {
-    setSharedInfoSheet({ counter, inviteCode: null, members: [] })
-    const [code, members] = await Promise.all([
+    // loading: inviteCode=undefined, members=undefined
+    setSharedInfoSheet({ counter, inviteCode: undefined, members: undefined })
+    const [code, mems] = await Promise.all([
       counter.role === 'owner' ? getInviteCode(counter.sharedId).catch(() => null) : Promise.resolve(null),
       getMembers(counter.sharedId).catch(() => []),
     ])
-    setSharedInfoSheet(prev => prev ? { ...prev, inviteCode: code, members } : null)
+    setSharedInfoSheet(prev => prev ? { ...prev, inviteCode: code, members: mems } : null)
   }
 
   // ── Folder management ─────────────────────────────────────────────────────
@@ -1197,8 +1198,8 @@ export default function MainPage() {
 
               {/* Miembros */}
               <div style={{ textAlign: 'left' }}>
-                {members.length === 0
-                  ? <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '8px 0' }}>Cargando miembros…</p>
+                {!members || members.length === 0
+                  ? <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '8px 0' }}>{members === undefined ? 'Cargando…' : 'Sin miembros'}</p>
                   : members.map(m => (
                     <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0',
                       borderBottom: '1px solid var(--card-stroke)' }}>

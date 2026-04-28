@@ -1176,21 +1176,20 @@ export default function MainPage() {
               <h3 style={{ margin: '0 0 16px' }}>{counter.name}</h3>
 
               {/* QR */}
-              {/* Contenedor del QR con padding para que respire */}
+              {/* Contenedor blanco fijo — QR centrado con margen */}
               <div style={{
-                display: 'inline-flex', padding: 14,
+                width: 160, height: 160,
                 background: '#fff', borderRadius: 20,
                 margin: '0 auto 10px',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {qrUrl ? (
-                  <img src={qrUrl} alt="QR" style={{ width: 110, height: 110, display: 'block', borderRadius: 4 }} />
+                  <img src={qrUrl} alt="QR" style={{ width: 110, height: 110, display: 'block' }} />
                 ) : (
-                  <div style={{ width: 110, height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 12, color: '#888', textAlign: 'center' }}>
-                      {inviteCode === undefined ? 'Cargando…' : 'Solo el propietario puede ver el QR'}
-                    </span>
-                  </div>
+                  <span style={{ fontSize: 12, color: '#888', textAlign: 'center', padding: '0 12px' }}>
+                    {inviteCode === undefined ? 'Cargando…' : 'Solo el propietario puede ver el QR'}
+                  </span>
                 )}
               </div>
 

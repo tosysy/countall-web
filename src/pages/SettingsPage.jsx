@@ -94,7 +94,7 @@ export default function SettingsPage() {
           <button className={styles.rowBtn} onClick={() => { setNewUsername(username ?? ''); setEditingUsername(true); setUsernameError('') }}>
             <div className={styles.avatarSmall}>
               {user?.photoURL
-                ? <img src={user.photoURL} alt="foto" className={styles.avatarImg} />
+                ? <img src={user.photoURL} alt="foto" className={styles.avatarImg} referrerPolicy="no-referrer" />
                 : avatarLetter
               }
             </div>

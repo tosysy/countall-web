@@ -1164,7 +1164,7 @@ export default function MainPage() {
         const { counter, inviteCode, members } = sharedInfoSheet
         const INVITE_BASE = 'https://tosysy.github.io/countall-web/?code='
         const qrUrl = inviteCode
-          ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=ffffff&color=000000&data=${encodeURIComponent(INVITE_BASE + inviteCode)}`
+          ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=ffffff&color=000000&data=${encodeURIComponent(INVITE_BASE + inviteCode)}`
           : null
         const ROLE_LABEL = { owner: 'Propietario', editor: 'Editor', viewer: 'Lector' }
         const ROLE_ICON  = { owner: '👑', editor: '✏️', viewer: '👁️' }

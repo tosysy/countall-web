@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import styles from './ExpandedCounter.module.css'
 import DatePicker from './DatePicker'
 import ColorPicker from './ColorPicker'
@@ -70,7 +71,9 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
   // Misc
   const [loading, setLoading]   = useState(false)
   const [msg, setMsg]           = useState(null)
-  const menuRef = useRef(null)
+  const menuRef = useRef(null)        // botón ⋮
+  const menuDropRef = useRef(null)    // dropdown portal
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
 
   // Computed display value
   const myUid = user?.uid
@@ -85,7 +88,10 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
   }, [counter.sharedId])
   useEffect(() => {
     if (!showMenu) return
-    const h = (e) => { if (!menuRef.current?.contains(e.target)) setShowMenu(false) }
+    const h = (e) => {
+      if (!menuRef.current?.contains(e.target) && !menuDropRef.current?.contains(e.target))
+        setShowMenu(false)
+    }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [showMenu])
@@ -296,38 +302,20 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               )}
             </div>
 
-            {/* ⋮ menu */}
-            <div style={{ position: 'relative' }} ref={menuRef}>
-              <button className={styles.heroBtn} onClick={() => setShowMenu(v => !v)} aria-label="Menú">
+            {/* ⋮ menu — dropdown en portal para no ser cortado por overflow:hidden */}
+            <div ref={menuRef}>
+              <button className={styles.heroBtn} aria-label="Menú"
+                onClick={() => {
+                  if (menuRef.current) {
+                    const r = menuRef.current.getBoundingClientRect()
+                    setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+                  }
+                  setShowMenu(v => !v)
+                }}>
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                   <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
                 </svg>
               </button>
-              {showMenu && (
-                <div className={styles.menuDropdown}>
-                  {canEdit && <button onClick={() => { setShowMenu(false); handleBgImage() }}>Cambiar imagen</button>}
-                  {canEdit && (bg || cardColor) && <button onClick={() => { setShowMenu(false); removeBg() }}>Quitar imagen</button>}
-                  {!counter.isShared && canEdit && <button onClick={() => { setShowMenu(false); handleShare() }}>Compartir</button>}
-                  {counter.isShared && isOwner && <button onClick={() => { setShowMenu(false); handleUnshare() }}>Dejar de compartir</button>}
-                  {counter.isShared && inviteCode && isOwner && (
-                    <>
-                      <button onClick={handleCopyCode}>Copiar enlace</button>
-                      <button onClick={() => { setShowMenu(false); setShowQr(v => !v) }}>Ver QR</button>
-                    </>
-                  )}
-                  {counter.folderId && onRemoveFromFolder && (
-                    <button onClick={() => { setShowMenu(false); onRemoveFromFolder() }}>Sacar de la carpeta</button>
-                  )}
-                  {canEdit && <button onClick={handleReset}>Reiniciar contador</button>}
-                  {counter.isShared && counter.role === 'viewer' && (
-                    <button onClick={handleRequestEdit}>Solicitar edición</button>
-                  )}
-                  {counter.isShared && !isOwner && (
-                    <button className={styles.menuDanger} onClick={handleAbandon}>Abandonar contador</button>
-                  )}
-                  <button className={styles.menuDanger} onClick={() => { setShowMenu(false); onDelete() }}>Eliminar</button>
-                </div>
-              )}
             </div>
           </div>
 
@@ -601,6 +589,95 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
         onPickImage={() => { setShowColorPicker(false); handleBgImage() }}
       />
     )}
+
+    {/* ⋮ Dropdown en portal (no se corta por overflow:hidden del panel) */}
+    {showMenu && createPortal(
+      <div ref={menuDropRef} style={{
+        position: 'fixed',
+        top: menuPos.top,
+        right: menuPos.right,
+        background: 'var(--card-bg)',
+        border: '1px solid var(--card-stroke)',
+        borderRadius: 14,
+        minWidth: 190,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.22)',
+        overflow: 'hidden',
+        zIndex: 9999,
+        animation: 'scaleIn 0.15s ease',
+        transformOrigin: 'top right',
+      }}>
+        {/* Fondo: imagen */}
+        {canEdit && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={() => { setShowMenu(false); handleBgImage() }}>
+            {(counter.backgroundImageLocal || counter.backgroundImageUrl) ? 'Cambiar imagen' : 'Imagen de fondo'}
+          </button>
+        )}
+        {canEdit && (counter.backgroundImageLocal || counter.backgroundImageUrl) && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={() => { setShowMenu(false); removeBg() }}>
+            Quitar imagen
+          </button>
+        )}
+        {/* Color */}
+        {canEdit && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={() => { setShowMenu(false); setShowColorPicker(true) }}>
+            Color de fondo
+          </button>
+        )}
+        {/* Sacar de carpeta */}
+        {counter.folderId && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={() => { setShowMenu(false); onRemoveFromFolder?.() }}>
+            Sacar de carpeta
+          </button>
+        )}
+        {/* Compartir */}
+        {!counter.isShared && isOwner && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={handleShare} disabled={loading}>
+            Compartir
+          </button>
+        )}
+        {/* Dejar de compartir */}
+        {counter.isShared && isOwner && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={handleUnshare} disabled={loading}>
+            Dejar de compartir
+          </button>
+        )}
+        {/* Solicitar permiso de edición */}
+        {counter.isShared && counter.role === 'viewer' && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={handleRequestEdit} disabled={loading}>
+            Solicitar edición
+          </button>
+        )}
+        {/* Reiniciar */}
+        {canEdit && (
+          <button className="portal-menu-item" style={menuItemStyle} onClick={handleReset}>
+            Reiniciar
+          </button>
+        )}
+        {/* Abandonar (miembros no-owner) */}
+        {counter.isShared && !isOwner && (
+          <button className="portal-menu-item" style={{ ...menuItemStyle, color: 'var(--danger)' }} onClick={handleAbandon} disabled={loading}>
+            Abandonar
+          </button>
+        )}
+        {/* Eliminar (solo owner) */}
+        {isOwner && (
+          <button className="portal-menu-item" style={{ ...menuItemStyle, color: 'var(--danger)' }}
+            onClick={() => { setShowMenu(false); onDelete() }}>
+            Eliminar
+          </button>
+        )}
+      </div>,
+      document.body
+    )}
     </>
   )
+}
+
+const menuItemStyle = {
+  display: 'block', width: '100%',
+  padding: '12px 16px', textAlign: 'left',
+  fontSize: 14, color: 'var(--text-primary)',
+  background: 'none', border: 'none', cursor: 'pointer',
+  fontFamily: 'inherit',
+  transition: 'background 0.1s',
 }

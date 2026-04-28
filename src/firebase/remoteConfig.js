@@ -1,13 +1,11 @@
-import { getRemoteConfig, fetchAndActivate, getValue, onConfigUpdated } from 'firebase/remote-config'
+import { getRemoteConfig, fetchAndActivate, getValue } from 'firebase/remote-config'
 import app from './config'
 
 const remoteConfig = getRemoteConfig(app)
 
-// Intervalo mínimo de fetch: 5 minutos (más corto para que onConfigUpdated
-// pueda propagar cambios sin esperar 1 hora)
-remoteConfig.settings.minimumFetchIntervalMillis = 300_000
+// Intervalo mínimo entre fetches reales de Firebase
+remoteConfig.settings.minimumFetchIntervalMillis = 60_000 // 1 min
 
-// Valores por defecto — se usan antes del primer fetch o si no hay red
 remoteConfig.defaultConfig = {
   maintenance_mode:    false,
   maintenance_message: 'La aplicación está en mantenimiento. Vuelve en breve.',
@@ -24,32 +22,23 @@ function getConfig() {
   }
 }
 
-/**
- * Fetch inicial + activación.
- * Devuelve la config actual.
- */
 export async function initRemoteConfig() {
-  try {
-    await fetchAndActivate(remoteConfig)
-  } catch {
-    // Sin red → defaults
-  }
+  try { await fetchAndActivate(remoteConfig) } catch { /* sin red → defaults */ }
   return getConfig()
 }
 
 /**
- * Suscripción en tiempo real.
- * Llama a `onChange(config)` cada vez que Firebase publica nuevos valores.
- * Devuelve la función de unsuscripción.
+ * Polling cada 60 s — llama onChange(config) cuando detecta cambios.
+ * Devuelve la función para detener el polling.
  */
 export function listenRemoteConfig(onChange) {
-  const unsub = onConfigUpdated(remoteConfig, async () => {
-    try {
-      await fetchAndActivate(remoteConfig)
-    } catch { /* sin red */ }
-    onChange(getConfig())
-  })
-  return unsub
+  let prev = JSON.stringify(getConfig())
+  const id = setInterval(async () => {
+    try { await fetchAndActivate(remoteConfig) } catch { return }
+    const next = JSON.stringify(getConfig())
+    if (next !== prev) { prev = next; onChange(getConfig()) }
+  }, 60_000)
+  return () => clearInterval(id)
 }
 
 export { remoteConfig, getConfig }

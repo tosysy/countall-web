@@ -3,7 +3,7 @@ import styles from './ExpandedCounter.module.css'
 import DatePicker from './DatePicker'
 import ColorPicker from './ColorPicker'
 import CompetitivePodium, { getProgressColor } from './CompetitivePodium'
-import { pushCounterUpdate, getMembers, setMemberRole, removeMember, sendInvitation, getInviteCode, shareCounter, unshareCounter, requestEditPermission, bumpBgVersion } from '../firebase/syncManager'
+import { pushCounterUpdate, getMembers, setMemberRole, removeMember, sendInvitation, getInviteCode, shareCounter, unshareCounter, requestEditPermission, bumpBgVersion, getFriends } from '../firebase/syncManager'
 import { uploadBackground as storageUpload, sharedCounterPath } from '../firebase/storageManager'
 import { uploadBackground as driveUploadBg, deleteBackground as driveDeleteBg } from '../firebase/driveManager'
 import useAppStore from '../store/appStore'
@@ -63,6 +63,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
 
   // Members states
   const [members, setMembers]           = useState([])
+  const [friends, setFriends]           = useState([])
   const [inviteUsername, setInviteUsername] = useState('')
   const [inviteRole, setInviteRole]     = useState('viewer')
   const [inviteCode, setInviteCode]     = useState(null)
@@ -81,7 +82,13 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
   const displayValue = counter.isCompetitive ? totalScore : counter.value
 
   // ── Effects ─────────────────────────────────────────────────────────────
-  useEffect(() => { if (tab === 'members' && counter.isShared) loadMembers() }, [tab])
+  useEffect(() => {
+    if (tab === 'members' && counter.isShared) {
+      loadMembers()
+      if (isOwner && friends.length === 0)
+        getFriends().then(list => setFriends(list.filter(f => f.status === 'accepted')))
+    }
+  }, [tab])
   useEffect(() => {
     if (counter.isShared && isOwner) getInviteCode(counter.sharedId).then(c => setInviteCode(c))
   }, [counter.sharedId])
@@ -97,7 +104,19 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const showMsg = (text, error = false) => { setMsg({ text, error }); setTimeout(() => setMsg(null), 3000) }
-  const loadMembers = async () => { if (counter.sharedId) setMembers(await getMembers(counter.sharedId)) }
+  const loadMembers = async () => {
+    if (!counter.sharedId) return
+    const roleOrder = { owner: 0, editor: 1, viewer: 2 }
+    const list = await getMembers(counter.sharedId)
+    // Sort: owner first, then editor, then viewer. Fix empty owner username.
+    const sorted = [...list]
+      .sort((a, b) => (roleOrder[a.role] ?? 3) - (roleOrder[b.role] ?? 3))
+      .map(m => ({
+        ...m,
+        username: m.username || (m.uid === user?.uid ? username : counter.ownerUsername) || m.username,
+      }))
+    setMembers(sorted)
+  }
 
   // ── Save handlers ────────────────────────────────────────────────────────
   const saveName = () => {
@@ -614,7 +633,16 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               {isOwner && (
                 <div className={styles.inviteBox}>
                   <h4>Invitar usuario</h4>
+                  {friends.length > 0 && (
+                    <datalist id="ec-friends-list">
+                      {friends
+                        .filter(f => !members.some(m => m.username === f.username))
+                        .map(f => <option key={f.uid} value={f.username} />)
+                      }
+                    </datalist>
+                  )}
                   <input className="input-field" placeholder="Nombre de usuario"
+                    list={friends.length > 0 ? 'ec-friends-list' : undefined}
                     value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} />
                   <div className={styles.inviteRoleRow}>
                     <select className="input-field" value={inviteRole} onChange={e => setInviteRole(e.target.value)} style={{ flex:1 }}>

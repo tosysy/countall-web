@@ -4,7 +4,7 @@ import {
   listenInvitations, listenSentInvitations,
   acceptInvitation, acceptFolderInvitation, rejectInvitation,
   cancelSentInvitation, sendInvitation, acceptEditRequest,
-  shareCounter, shareFolder, schedulePushPersonalData,
+  shareCounter, shareFolder, schedulePushPersonalData, getFriends,
 } from '../firebase/syncManager'
 import useAppStore from '../store/appStore'
 import styles from './InvitationsPage.module.css'
@@ -21,6 +21,7 @@ export default function InvitationsPage() {
   const [showSend, setShowSend] = useState(false)
   const [sendForm, setSendForm] = useState({ itemId:'', sharedId:'', itemName:'', toUsername:'', role:'viewer', isFolder:false })
   const [sendLoading, setSendLoading] = useState(false)
+  const [friendSuggestions, setFriendSuggestions] = useState([])
 
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(null), 3000) }
 
@@ -32,6 +33,7 @@ export default function InvitationsPage() {
   useEffect(() => {
     const u1 = listenInvitations(setReceived)
     const u2 = listenSentInvitations(setSent)
+    getFriends().then(list => setFriendSuggestions(list.filter(f => f.status === 'accepted').map(f => f.username)))
     return () => { u1(); u2() }
   }, [])
 
@@ -270,11 +272,17 @@ export default function InvitationsPage() {
 
             {/* Usuario destino */}
             <p className={styles.sendLabel}>Usuario</p>
+            {friendSuggestions.length > 0 && (
+              <datalist id="inv-friends-list">
+                {friendSuggestions.map(u => <option key={u} value={u} />)}
+              </datalist>
+            )}
             <div className={styles.sendInputWrap}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ color:'var(--text-secondary)', flexShrink:0 }}>
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
               </svg>
               <input className={styles.sendInput} placeholder="Nombre de usuario"
+                list={friendSuggestions.length > 0 ? 'inv-friends-list' : undefined}
                 value={sendForm.toUsername}
                 onChange={e => setSendForm(f => ({ ...f, toUsername:e.target.value }))} />
             </div>

@@ -510,7 +510,16 @@ export default function MainPage() {
       counter.role === 'owner' ? getInviteCode(counter.sharedId).catch(() => null) : Promise.resolve(null),
       getMembers(counter.sharedId).catch(() => []),
     ])
-    setSharedInfoSheet(prev => prev ? { ...prev, inviteCode: code, members: mems } : null)
+    const roleOrder = { owner: 0, editor: 1, viewer: 2 }
+    const sorted = [...mems].sort((a, b) => (roleOrder[a.role] ?? 3) - (roleOrder[b.role] ?? 3))
+    // Fix owner username if empty (may be null from old data)
+    const currentUsername = useAppStore.getState().username
+    const currentUid = useAppStore.getState().user?.uid
+    const fixed = sorted.map(m => ({
+      ...m,
+      username: m.username || (m.role === 'owner' && m.uid === currentUid ? currentUsername : counter.ownerUsername || m.username),
+    }))
+    setSharedInfoSheet(prev => prev ? { ...prev, inviteCode: code, members: fixed } : null)
   }
 
   // ── Folder management ─────────────────────────────────────────────────────

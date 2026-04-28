@@ -84,7 +84,7 @@ export default function CounterCard({ counter, onIncrement, onDecrement, onClick
       {/* Botón menú 3 puntos */}
       {onMenu && (
         <button className={styles.menuBtn}
-          onPointerDown={e => { e.stopPropagation(); onMenu(counter) }}
+          onPointerDown={e => { e.stopPropagation(); onMenu(counter, e) }}
           style={(bg || cardColor) ? { background: 'rgba(0,0,0,0.35)', color: '#fff' } : {}}
         >
           <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">

@@ -53,6 +53,7 @@ export default function MainPage() {
   const [dragOverKey, setDragOverKey] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
   const [expandedShowMenu, setExpandedShowMenu] = useState(false)
+  const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
   const [editFolderColor, setEditFolderColor] = useState(null)
@@ -745,7 +746,10 @@ export default function MainPage() {
                     onIncrement={() => !selectionMode && handleIncrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onDecrement={() => !selectionMode && handleDecrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onClick={(c) => selectionMode ? toggleSelect(key) : setExpanded(c)}
-                    onMenu={!selectionMode ? (c) => { setExpanded(c); setExpandedShowMenu(true) } : undefined}
+                    onMenu={!selectionMode ? (c, e) => {
+                      const r = e.currentTarget.getBoundingClientRect()
+                      setCounterMenu({ counter: c, top: r.bottom + 4, right: window.innerWidth - r.right })
+                    } : undefined}
                   />
                 ) : (
                   <FolderCard
@@ -1083,6 +1087,63 @@ export default function MainPage() {
         />
       )}
 
+      {/* ── Menú contextual de contador ─────────────────────────────────── */}
+      {counterMenu && (
+        <>
+          {/* capa transparente para cerrar al hacer clic fuera */}
+          <div style={{ position:'fixed', inset:0, zIndex:49 }}
+            onPointerDown={() => setCounterMenu(null)} />
+          <div style={{
+            position: 'fixed',
+            top: counterMenu.top,
+            right: counterMenu.right,
+            background: 'var(--card-bg)',
+            border: '1px solid var(--card-stroke)',
+            borderRadius: 14,
+            minWidth: 190,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+            overflow: 'hidden',
+            zIndex: 50,
+            animation: 'scaleIn 0.15s ease',
+            transformOrigin: 'top right',
+          }}>
+            {/* Editar → abre el contador ampliado */}
+            <button className="portal-menu-item" style={cMenuStyle}
+              onClick={() => { setExpanded(counterMenu.counter); setCounterMenu(null) }}>
+              Editar
+            </button>
+            {/* Sacar de carpeta */}
+            {counterMenu.counter.folderId && (
+              <button className="portal-menu-item" style={cMenuStyle}
+                onClick={() => { handleRemoveFromFolder(counterMenu.counter); setCounterMenu(null) }}>
+                Sacar de carpeta
+              </button>
+            )}
+            {/* Compartir */}
+            {!counterMenu.counter.isShared && (
+              <button className="portal-menu-item" style={cMenuStyle}
+                onClick={() => { setExpanded(counterMenu.counter); setCounterMenu(null) }}>
+                Compartir
+              </button>
+            )}
+            {counterMenu.counter.isShared && counterMenu.counter.role === 'owner' && (
+              <button className="portal-menu-item" style={cMenuStyle}
+                onClick={() => { setExpanded(counterMenu.counter); setCounterMenu(null) }}>
+                Dejar de compartir
+              </button>
+            )}
+            {/* Eliminar */}
+            <button className="portal-menu-item" style={{ ...cMenuStyle, color: 'var(--danger)' }}
+              onClick={() => {
+                setCounterMenu(null)
+                handleDelete(counterMenu.counter)
+              }}>
+              Eliminar
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}
 
@@ -1101,4 +1162,13 @@ export default function MainPage() {
       )}
     </div>
   )
+}
+
+const cMenuStyle = {
+  display: 'block', width: '100%',
+  padding: '12px 16px', textAlign: 'left',
+  fontSize: 14, color: 'var(--text-primary)',
+  background: 'none', border: 'none', cursor: 'pointer',
+  fontFamily: 'inherit',
+  transition: 'background 0.1s',
 }

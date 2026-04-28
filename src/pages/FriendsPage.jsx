@@ -21,6 +21,7 @@ export default function FriendsPage() {
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [inSearchMode, setInSearchMode] = useState(false)
+  const [dismissingId, setDismissingId] = useState(null)
   const searchTimer = useRef(null)
   const lastQuery = useRef('')
 
@@ -55,6 +56,12 @@ export default function FriendsPage() {
   }
 
   const clearSearch = () => { setSearch(''); setInSearchMode(false); setSearchResults([]); setSearching(false) }
+
+  // Anima la tarjeta hacia la derecha y luego ejecuta la acción (igual que Android)
+  const dismissThen = (uid, action) => {
+    setDismissingId(uid)
+    setTimeout(() => { action(); setDismissingId(null) }, 420)
+  }
 
   const handleSendRequest = async (targetUid, username) => {
     try {
@@ -177,9 +184,10 @@ export default function FriendsPage() {
               const isSelf = f.uid === user?.uid
               if (isSelf) return null
               return <UserCard key={f.uid} user={f} state={state}
+                isDismissing={dismissingId === f.uid}
                 onAdd={() => handleSendRequest(f.uid, f.username)}
-                onCancel={() => handleCancelRequest(f.uid)}
-                onRemove={() => handleRemove(f.uid)} />
+                onCancel={() => dismissThen(f.uid, () => handleCancelRequest(f.uid))}
+                onRemove={() => dismissThen(f.uid, () => handleRemove(f.uid))} />
             })}
           </>
         )}
@@ -193,7 +201,8 @@ export default function FriendsPage() {
               </div>
             : pendingSent.map(f => (
                 <UserCard key={f.uid} user={f} state="sent"
-                  onCancel={() => handleCancelRequest(f.uid)} />
+                  isDismissing={dismissingId === f.uid}
+                  onCancel={() => dismissThen(f.uid, () => handleCancelRequest(f.uid))} />
               ))
         )}
 
@@ -206,8 +215,9 @@ export default function FriendsPage() {
               </div>
             : received.map(f => (
                 <UserCard key={f.uid} user={f} state="received"
+                  isDismissing={dismissingId === f.uid}
                   onAccept={() => handleAccept(f)}
-                  onReject={() => handleReject(f)} />
+                  onReject={() => dismissThen(f.uid, () => handleReject(f))} />
               ))
         )}
       </div>
@@ -215,7 +225,7 @@ export default function FriendsPage() {
   )
 }
 
-function UserCard({ user: f, state, onAdd, onCancel, onRemove, onAccept, onReject }) {
+function UserCard({ user: f, state, isDismissing, onAdd, onCancel, onRemove, onAccept, onReject }) {
   const color = (() => {
     const COLORS = ['#5C6BC0','#26A69A','#66BB6A','#EC407A','#FFA726','#42A5F5','#8D6E63','#78909C']
     let h = 0; for (const c of (f.username ?? '')) h = (h * 31 + c.charCodeAt(0)) >>> 0
@@ -225,22 +235,24 @@ function UserCard({ user: f, state, onAdd, onCancel, onRemove, onAccept, onRejec
   const stateLabel = { accepted:'Amigo', sent:'Solicitud enviada', received:'Quiere ser tu amigo', none:'' }[state]
 
   return (
-    <div className={styles.userCard}>
-      <div className={styles.avatar} style={{ background: color }}>
-        {f.username?.[0]?.toUpperCase() ?? '?'}
-      </div>
-      <div className={styles.userInfo}>
-        <span className={styles.userName}>{f.username}</span>
-        {stateLabel && <span className={styles.userSub}>{stateLabel}</span>}
-      </div>
-      <div className={styles.userActions}>
-        {state === 'none'     && <button className={styles.btnAdd}    onClick={onAdd}>Añadir</button>}
-        {state === 'sent'     && <button className={styles.btnGhost}  onClick={onCancel}>Cancelar</button>}
-        {state === 'accepted' && <button className={styles.btnDanger} onClick={onRemove}>Eliminar</button>}
-        {state === 'received' && <>
-          <button className={styles.btnAdd}   onClick={onAccept}>Aceptar</button>
-          <button className={styles.btnGhost} onClick={onReject}>Rechazar</button>
-        </>}
+    <div className={isDismissing ? styles.collapseWrap : undefined}>
+      <div className={`${styles.userCard} ${isDismissing ? styles.userCardDismissing : ''}`}>
+        <div className={styles.avatar} style={{ background: color }}>
+          {f.username?.[0]?.toUpperCase() ?? '?'}
+        </div>
+        <div className={styles.userInfo}>
+          <span className={styles.userName}>{f.username}</span>
+          {stateLabel && <span className={styles.userSub}>{stateLabel}</span>}
+        </div>
+        <div className={styles.userActions}>
+          {state === 'none'     && <button className={styles.btnAdd}    onClick={onAdd}>Añadir</button>}
+          {state === 'sent'     && <button className={styles.btnGhost}  onClick={onCancel}>Cancelar</button>}
+          {state === 'accepted' && <button className={styles.btnDanger} onClick={onRemove}>Eliminar</button>}
+          {state === 'received' && <>
+            <button className={styles.btnAdd}   onClick={onAccept}>Aceptar</button>
+            <button className={styles.btnGhost} onClick={onReject}>Rechazar</button>
+          </>}
+        </div>
       </div>
     </div>
   )

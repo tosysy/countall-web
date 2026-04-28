@@ -16,12 +16,18 @@ export default function InvitationsPage() {
   const [received, setReceived] = useState([])
   const [sent, setSent] = useState([])
   const [loading, setLoading] = useState(null)
+  const [dismissingId, setDismissingId] = useState(null)
   const [toast, setToast] = useState(null)
   const [showSend, setShowSend] = useState(false)
   const [sendForm, setSendForm] = useState({ itemId:'', sharedId:'', itemName:'', toUsername:'', role:'viewer', isFolder:false })
   const [sendLoading, setSendLoading] = useState(false)
 
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(null), 3000) }
+
+  const dismissThen = (id, action) => {
+    setDismissingId(id)
+    setTimeout(() => { action(); setDismissingId(null) }, 420)
+  }
 
   useEffect(() => {
     const u1 = listenInvitations(setReceived)
@@ -59,18 +65,18 @@ export default function InvitationsPage() {
     finally { setLoading(null) }
   }
 
-  const handleReject = async (inv) => {
-    setLoading(inv.id)
-    try { await rejectInvitation(inv); showToast('Invitación rechazada') }
-    catch (e) { showToast('Error: ' + e.message) }
-    finally { setLoading(null) }
+  const handleReject = (inv) => {
+    dismissThen(inv.id, async () => {
+      try { await rejectInvitation(inv); showToast('Invitación rechazada') }
+      catch (e) { showToast('Error: ' + e.message) }
+    })
   }
 
-  const handleCancel = async (inv) => {
-    setLoading(inv.id)
-    try { await cancelSentInvitation(inv); showToast('Invitación cancelada') }
-    catch (e) { showToast('Error: ' + e.message) }
-    finally { setLoading(null) }
+  const handleCancel = (inv) => {
+    dismissThen(inv.id, async () => {
+      try { await cancelSentInvitation(inv); showToast('Invitación cancelada') }
+      catch (e) { showToast('Error: ' + e.message) }
+    })
   }
 
   const handleSend = async () => {
@@ -161,39 +167,41 @@ export default function InvitationsPage() {
                 <p>No hay invitaciones recibidas</p>
               </div>
             : received.map(inv => (
-                <div key={inv.id} className={styles.card}>
-                  {/* Icono tipo */}
-                  <div className={`${styles.typeIcon} ${inv.isRequest ? styles.typeRequest : inv.isFolder ? styles.typeFolder : styles.typeCounter}`}>
-                    {inv.isRequest
-                      ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-                      : inv.isFolder
-                        ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                        : <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    }
-                  </div>
+                <div key={inv.id} className={dismissingId === inv.id ? styles.collapseWrap : undefined}>
+                  <div className={`${styles.card} ${dismissingId === inv.id ? styles.cardDismissing : ''}`}>
+                    {/* Icono tipo */}
+                    <div className={`${styles.typeIcon} ${inv.isRequest ? styles.typeRequest : inv.isFolder ? styles.typeFolder : styles.typeCounter}`}>
+                      {inv.isRequest
+                        ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                        : inv.isFolder
+                          ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                          : <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      }
+                    </div>
 
-                  {/* Info */}
-                  <div className={styles.cardInfo}>
-                    <p className={styles.cardTitle}>{inv.itemName}</p>
-                    {inv.isRequest
-                      ? <p className={styles.cardSub}><strong>{inv.fromUsername}</strong> solicita permiso de edición</p>
-                      : <>
-                          <p className={styles.cardSub}>De <strong>{inv.fromUsername}</strong></p>
-                          <p className={styles.cardMeta}>
-                            {inv.isFolder ? 'Carpeta' : 'Contador'} · {inv.role === 'editor' ? 'Editor' : 'Solo ver'}
-                          </p>
-                        </>
-                    }
-                  </div>
+                    {/* Info */}
+                    <div className={styles.cardInfo}>
+                      <p className={styles.cardTitle}>{inv.itemName}</p>
+                      {inv.isRequest
+                        ? <p className={styles.cardSub}><strong>{inv.fromUsername}</strong> solicita permiso de edición</p>
+                        : <>
+                            <p className={styles.cardSub}>De <strong>{inv.fromUsername}</strong></p>
+                            <p className={styles.cardMeta}>
+                              {inv.isFolder ? 'Carpeta' : 'Contador'} · {inv.role === 'editor' ? 'Editor' : 'Solo ver'}
+                            </p>
+                          </>
+                      }
+                    </div>
 
-                  {/* Acciones */}
-                  <div className={styles.cardActions}>
-                    <button className={styles.btnAccept} disabled={loading===inv.id} onClick={() => handleAccept(inv)}>
-                      {loading===inv.id ? <span className="spinner" style={{width:14,height:14}}/> : 'Aceptar'}
-                    </button>
-                    <button className={styles.btnReject} disabled={loading===inv.id} onClick={() => handleReject(inv)}>
-                      Rechazar
-                    </button>
+                    {/* Acciones */}
+                    <div className={styles.cardActions}>
+                      <button className={styles.btnAccept} disabled={loading===inv.id || dismissingId===inv.id} onClick={() => handleAccept(inv)}>
+                        {loading===inv.id ? <span className="spinner" style={{width:14,height:14}}/> : 'Aceptar'}
+                      </button>
+                      <button className={styles.btnReject} disabled={loading===inv.id || dismissingId===inv.id} onClick={() => handleReject(inv)}>
+                        Rechazar
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -209,21 +217,23 @@ export default function InvitationsPage() {
                 <p>No hay invitaciones enviadas</p>
               </div>
             : sent.map(inv => (
-                <div key={inv.id} className={styles.card}>
-                  <div className={`${styles.typeIcon} ${inv.isFolder ? styles.typeFolder : styles.typeCounter}`}>
-                    {inv.isFolder
-                      ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                      : <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    }
+                <div key={inv.id} className={dismissingId === inv.id ? styles.collapseWrap : undefined}>
+                  <div className={`${styles.card} ${dismissingId === inv.id ? styles.cardDismissing : ''}`}>
+                    <div className={`${styles.typeIcon} ${inv.isFolder ? styles.typeFolder : styles.typeCounter}`}>
+                      {inv.isFolder
+                        ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                        : <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      }
+                    </div>
+                    <div className={styles.cardInfo}>
+                      <p className={styles.cardTitle}>{inv.itemName}</p>
+                      <p className={styles.cardSub}>Para <strong>{inv.toUsername}</strong></p>
+                      <p className={styles.cardMeta}>{inv.role === 'editor' ? 'Editor' : 'Solo ver'} · Pendiente</p>
+                    </div>
+                    <button className={styles.btnCancel} disabled={loading===inv.id || dismissingId===inv.id} onClick={() => handleCancel(inv)}>
+                      {loading===inv.id ? <span className="spinner" style={{width:14,height:14}}/> : 'Cancelar'}
+                    </button>
                   </div>
-                  <div className={styles.cardInfo}>
-                    <p className={styles.cardTitle}>{inv.itemName}</p>
-                    <p className={styles.cardSub}>Para <strong>{inv.toUsername}</strong></p>
-                    <p className={styles.cardMeta}>{inv.role === 'editor' ? 'Editor' : 'Solo ver'} · Pendiente</p>
-                  </div>
-                  <button className={styles.btnCancel} disabled={loading===inv.id} onClick={() => handleCancel(inv)}>
-                    {loading===inv.id ? <span className="spinner" style={{width:14,height:14}}/> : 'Cancelar'}
-                  </button>
                 </div>
               ))
         )}

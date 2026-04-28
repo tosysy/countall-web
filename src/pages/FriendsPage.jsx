@@ -13,14 +13,14 @@ function avatarColor(name = '') {
 export default function FriendsPage() {
   const navigate = useNavigate()
   const { user } = useAppStore()
-  const [tab, setTab] = useState('friends') // friends | sent | received
+  const [tab, setTab] = useState('friends')
   const [friends, setFriends] = useState([])
   const [received, setReceived] = useState([])
+  const [pendingSent, setPendingSent] = useState([])
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
   const [inSearchMode, setInSearchMode] = useState(false)
-  const [pendingSent, setPendingSent] = useState([]) // [{uid, username}] with pending sent requests
-  const [loading, setLoading] = useState(false)
   const searchTimer = useRef(null)
   const lastQuery = useRef('')
 
@@ -33,26 +33,28 @@ export default function FriendsPage() {
   const loadFriends = async () => {
     const list = await getFriends()
     setFriends(list.filter(f => f.status === 'accepted'))
-    const sent = list.filter(f => f.status === 'pending' && f.direction === 'sent').map(f => ({ uid: f.uid, username: f.username }))
-    setPendingSent(sent)
+    setPendingSent(list.filter(f => f.status === 'pending' && f.direction === 'sent').map(f => ({ uid: f.uid, username: f.username })))
   }
 
   const handleSearchChange = (e) => {
     const q = e.target.value
     setSearch(q)
     clearTimeout(searchTimer.current)
-    if (!q.trim()) {
-      setInSearchMode(false); setSearchResults([]); return
-    }
-    searchTimer.current = setTimeout(async () => {
-      if (q !== search + e.nativeEvent.data) {} // just run
-      const results = await searchUsers(q.trim()).catch(() => [])
-      if (lastQuery.current !== q) return
-      setInSearchMode(true)
-      setSearchResults(results)
-    }, 220)
+    if (!q.trim()) { setInSearchMode(false); setSearchResults([]); return }
     lastQuery.current = q
+    setSearching(true)
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const results = await searchUsers(q.trim())
+        if (lastQuery.current !== q) return
+        setSearchResults(results)
+        setInSearchMode(true)
+      } catch { setSearchResults([]) }
+      finally { setSearching(false) }
+    }, 300)
   }
+
+  const clearSearch = () => { setSearch(''); setInSearchMode(false); setSearchResults([]); setSearching(false) }
 
   const handleSendRequest = async (targetUid, username) => {
     try {
@@ -69,10 +71,10 @@ export default function FriendsPage() {
     } catch (e) { alert(e.message) }
   }
 
-  const handleRemove = async (friendUid) => {
+  const handleRemove = async (uid) => {
     if (!confirm('¿Eliminar de amigos?')) return
-    await removeFriend(friendUid)
-    setFriends(f => f.filter(fr => fr.uid !== friendUid))
+    await removeFriend(uid)
+    setFriends(f => f.filter(fr => fr.uid !== uid))
   }
 
   const handleReject = async (friend) => {
@@ -80,10 +82,10 @@ export default function FriendsPage() {
     setReceived(r => r.filter(f => f.uid !== friend.uid))
   }
 
-  const handleCancelRequest = async (targetUid) => {
+  const handleCancelRequest = async (uid) => {
     if (!confirm('¿Cancelar solicitud?')) return
-    await removeFriend(targetUid)
-    setPendingSent(s => s.filter(f => f.uid !== targetUid))
+    await removeFriend(uid)
+    setPendingSent(s => s.filter(f => f.uid !== uid))
   }
 
   const getState = (uid) => {
@@ -106,118 +108,139 @@ export default function FriendsPage() {
         <h1 className={styles.title}>Amigos</h1>
       </header>
 
+      {/* Search bar — siempre visible en la pestaña Amigos */}
+      {tab === 'friends' && (
+        <div className={styles.searchWrap}>
+          <div className={styles.searchBox}>
+            {searching
+              ? <span className="spinner" style={{ width:16, height:16, flexShrink:0 }} />
+              : <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" style={{ color:'var(--text-secondary)', flexShrink:0 }}>
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+            }
+            <input
+              className={styles.searchInput}
+              placeholder="Buscar por nombre de usuario..."
+              value={search}
+              onChange={handleSearchChange}
+              autoComplete="off"
+            />
+            {search && (
+              <button className={styles.searchClear} onClick={clearSearch}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className={styles.tabs}>
         <div className={styles.tabIndicator}
           style={{ transform: `translateX(${{ friends:0, sent:1, received:2 }[tab] * 100}%)`, width: '33.33%' }} />
-        {['friends','sent','received'].map((t, i) => (
-          <button key={t} className={`${styles.tab} ${tab === t ? styles.active : ''}`}
-            onClick={() => { setTab(t); setSearch(''); setInSearchMode(false); setSearchResults([]) }}>
-            {{ friends:'Agregados', sent:'Enviadas', received:'Recibidas' }[t]}
-            {t === 'received' && received.length > 0 && <span className={styles.tabBadge} />}
+        {[
+          { id:'friends', label:'Amigos' },
+          { id:'sent',    label:'Enviadas' },
+          { id:'received',label:'Recibidas' },
+        ].map(t => (
+          <button key={t.id} className={`${styles.tab} ${tab === t.id ? styles.active : ''}`}
+            onClick={() => { setTab(t.id); clearSearch() }}>
+            {t.label}
+            {t.id === 'received' && received.length > 0 && <span className={styles.tabBadge} />}
           </button>
         ))}
       </div>
 
-      {/* Search bar (solo en tab friends) */}
-      {tab === 'friends' && (
-        <div className={styles.searchBox}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ color:'var(--text-secondary)', flexShrink:0 }}>
-            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" strokeWidth="2" fill="none"/>
-          </svg>
-          <input
-            className={styles.searchInput}
-            placeholder="Buscar usuario"
-            value={search}
-            onChange={handleSearchChange}
-          />
-          {search && (
-            <button style={{ color:'var(--text-secondary)' }}
-              onClick={() => { setSearch(''); setInSearchMode(false); setSearchResults([]) }}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-              </svg>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Content */}
+      {/* Listas */}
       <div className={styles.list}>
+
+        {/* ── AMIGOS / BÚSQUEDA ── */}
         {tab === 'friends' && (
           <>
-            {displayList.length === 0 && (
-              <p className={styles.empty}>
-                {inSearchMode ? `Sin resultados para "${search}"` : 'Aún no tienes amigos agregados'}
+            {inSearchMode && (
+              <p className={styles.sectionLabel}>
+                {searchResults.length > 0 ? `${searchResults.length} resultado${searchResults.length > 1 ? 's' : ''}` : `Sin resultados para "${search}"`}
               </p>
+            )}
+            {!inSearchMode && friends.length === 0 && (
+              <div className="empty-state">
+                <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+                <p>Busca un usuario para agregar amigos</p>
+              </div>
             )}
             {displayList.map(f => {
               const state = getState(f.uid)
-              return (
-                <div key={f.uid} className={styles.userCard}>
-                  <div className="avatar" style={{ background: avatarColor(f.username) }}>
-                    {f.username?.[0]?.toUpperCase() ?? '?'}
-                  </div>
-                  <div className={styles.userInfo}>
-                    <span className={styles.userName}>{f.username}</span>
-                    {state === 'sent' && <span className={styles.userSub}>Solicitud enviada</span>}
-                    {state === 'accepted' && <span className={styles.userSub}>Amigo</span>}
-                  </div>
-                  <div className={styles.userActions}>
-                    {state === 'none' && (
-                      <button className={styles.btnAdd} onClick={() => handleSendRequest(f.uid, f.username)}>Añadir</button>
-                    )}
-                    {state === 'sent' && (
-                      <button className={styles.btnCancel} onClick={() => handleCancelRequest(f.uid)}>Cancelar</button>
-                    )}
-                    {state === 'accepted' && (
-                      <button className={styles.btnRemove} onClick={() => handleRemove(f.uid)}>Eliminar</button>
-                    )}
-                  </div>
-                </div>
-              )
+              const isSelf = f.uid === user?.uid
+              if (isSelf) return null
+              return <UserCard key={f.uid} user={f} state={state}
+                onAdd={() => handleSendRequest(f.uid, f.username)}
+                onCancel={() => handleCancelRequest(f.uid)}
+                onRemove={() => handleRemove(f.uid)} />
             })}
           </>
         )}
 
+        {/* ── ENVIADAS ── */}
         {tab === 'sent' && (
-          <>
-            {pendingSent.length === 0 && <p className={styles.empty}>No hay solicitudes enviadas</p>}
-            {pendingSent.map(f => (
-              <div key={f.uid} className={styles.userCard}>
-                <div className="avatar" style={{ background: avatarColor(f.username) }}>
-                  {f.username?.[0]?.toUpperCase() ?? '?'}
-                </div>
-                <div className={styles.userInfo}>
-                  <span className={styles.userName}>{f.username}</span>
-                  <span className={styles.userSub}>Solicitud enviada</span>
-                </div>
-                <button className={styles.btnCancel} onClick={() => handleCancelRequest(f.uid)}>Cancelar</button>
+          pendingSent.length === 0
+            ? <div className="empty-state">
+                <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                <p>No hay solicitudes enviadas</p>
               </div>
-            ))}
-          </>
+            : pendingSent.map(f => (
+                <UserCard key={f.uid} user={f} state="sent"
+                  onCancel={() => handleCancelRequest(f.uid)} />
+              ))
         )}
 
+        {/* ── RECIBIDAS ── */}
         {tab === 'received' && (
-          <>
-            {received.length === 0 && <p className={styles.empty}>No hay solicitudes recibidas</p>}
-            {received.map(f => (
-              <div key={f.uid} className={styles.userCard}>
-                <div className="avatar" style={{ background: avatarColor(f.username) }}>
-                  {f.username?.[0]?.toUpperCase() ?? '?'}
-                </div>
-                <div className={styles.userInfo}>
-                  <span className={styles.userName}>{f.username}</span>
-                  <span className={styles.userSub}>Quiere ser tu amigo</span>
-                </div>
-                <div className={styles.userActions}>
-                  <button className={styles.btnAdd} onClick={() => handleAccept(f)}>Aceptar</button>
-                  <button className={styles.btnCancel} onClick={() => handleReject(f)}>Rechazar</button>
-                </div>
+          received.length === 0
+            ? <div className="empty-state">
+                <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                <p>No hay solicitudes recibidas</p>
               </div>
-            ))}
-          </>
+            : received.map(f => (
+                <UserCard key={f.uid} user={f} state="received"
+                  onAccept={() => handleAccept(f)}
+                  onReject={() => handleReject(f)} />
+              ))
         )}
+      </div>
+    </div>
+  )
+}
+
+function UserCard({ user: f, state, onAdd, onCancel, onRemove, onAccept, onReject }) {
+  const color = (() => {
+    const COLORS = ['#5C6BC0','#26A69A','#66BB6A','#EC407A','#FFA726','#42A5F5','#8D6E63','#78909C']
+    let h = 0; for (const c of (f.username ?? '')) h = (h * 31 + c.charCodeAt(0)) >>> 0
+    return COLORS[h % COLORS.length]
+  })()
+
+  const stateLabel = { accepted:'Amigo', sent:'Solicitud enviada', received:'Quiere ser tu amigo', none:'' }[state]
+
+  return (
+    <div className={styles.userCard}>
+      <div className={styles.avatar} style={{ background: color }}>
+        {f.username?.[0]?.toUpperCase() ?? '?'}
+      </div>
+      <div className={styles.userInfo}>
+        <span className={styles.userName}>{f.username}</span>
+        {stateLabel && <span className={styles.userSub}>{stateLabel}</span>}
+      </div>
+      <div className={styles.userActions}>
+        {state === 'none'     && <button className={styles.btnAdd}    onClick={onAdd}>Añadir</button>}
+        {state === 'sent'     && <button className={styles.btnGhost}  onClick={onCancel}>Cancelar</button>}
+        {state === 'accepted' && <button className={styles.btnDanger} onClick={onRemove}>Eliminar</button>}
+        {state === 'received' && <>
+          <button className={styles.btnAdd}   onClick={onAccept}>Aceptar</button>
+          <button className={styles.btnGhost} onClick={onReject}>Rechazar</button>
+        </>}
       </div>
     </div>
   )

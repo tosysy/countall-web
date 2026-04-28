@@ -1176,17 +1176,23 @@ export default function MainPage() {
               <h3 style={{ margin: '0 0 16px' }}>{counter.name}</h3>
 
               {/* QR */}
-              {qrUrl ? (
-                <img src={qrUrl} alt="QR"
-                  style={{ width: 120, height: 120, borderRadius: 20, margin: '0 auto 10px', display: 'block', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }} />
-              ) : (
-                <div style={{ width: 120, height: 120, borderRadius: 20, margin: '0 auto 10px',
-                  background: 'var(--log-card-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 8px', textAlign: 'center' }}>
-                    {inviteCode === undefined ? 'Cargando…' : 'Solo el propietario puede ver el QR'}
-                  </span>
-                </div>
-              )}
+              {/* Contenedor del QR con padding para que respire */}
+              <div style={{
+                display: 'inline-flex', padding: 14,
+                background: '#fff', borderRadius: 20,
+                margin: '0 auto 10px',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+              }}>
+                {qrUrl ? (
+                  <img src={qrUrl} alt="QR" style={{ width: 110, height: 110, display: 'block', borderRadius: 4 }} />
+                ) : (
+                  <div style={{ width: 110, height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#888', textAlign: 'center' }}>
+                      {inviteCode === undefined ? 'Cargando…' : 'Solo el propietario puede ver el QR'}
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {/* Código */}
               {inviteCode && (

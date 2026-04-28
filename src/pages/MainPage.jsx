@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import CounterCard from '../components/CounterCard'
 import FolderCard from '../components/FolderCard'
@@ -56,7 +56,8 @@ export default function MainPage() {
   const [dragOverFolder, setDragOverFolder] = useState(null)
   // dragClone: { item, x, y, width, height } — clone flotante que sigue el puntero
   const [dragClone, setDragClone] = useState(null)
-  const dragStateRef = useRef(null) // acceso sin stale closure en pointermove
+  const dragStateRef = useRef(null)     // acceso sin stale closure en pointermove
+  const itemPositionsRef = useRef({})  // posiciones pre-reorder para FLIP animation
   const [expandedShowMenu, setExpandedShowMenu] = useState(false)
   const [expandedInitialTab, setExpandedInitialTab] = useState('log')
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
@@ -436,7 +437,11 @@ export default function MainPage() {
   // ── Drag & Drop ──────────────────────────────────────────────────────────
   const getItemKey = (item) => `${item.type === 'counter' ? 'C' : 'F'}:${item.data.id}`
 
-  const resetDrag = () => { setDragKey(null); setDragOverKey(null); setDragOverFolder(null); setDragClone(null); dragStateRef.current = null }
+  const resetDrag = () => {
+    document.querySelectorAll('[data-drag-key]').forEach(el => { el.style.transform = ''; el.style.transition = '' })
+    setDragKey(null); setDragOverKey(null); setDragOverFolder(null); setDragClone(null)
+    dragStateRef.current = null; itemPositionsRef.current = {}
+  }
 
   // ── Drag reorder helpers ──────────────────────────────────────────────────
 
@@ -500,23 +505,34 @@ export default function MainPage() {
   const handleDragPointerMove = useCallback((e) => {
     const state = dragStateRef.current
     if (!state) return
-    const x = e.clientX - state.offsetX
-    const y = e.clientY - state.offsetY
-    setDragClone(prev => prev ? { ...prev, x, y } : null)
 
-    // Ocultar temporalmente el clone para hacer hit-test debajo de él
-    const cloneEl = document.getElementById('drag-clone-portal')
-    if (cloneEl) cloneEl.style.pointerEvents = 'none'
-    const el = document.elementFromPoint(e.clientX, e.clientY)
-    const overCard = el?.closest('[data-drag-key]')
-    if (overCard) {
-      const overKey = overCard.getAttribute('data-drag-key')
-      if (overKey && overKey !== state.dragOverKey) {
-        state.dragOverKey = overKey
-        setDragOverKey(overKey)
-        // Forzar re-render para getLiveItems
-        setDragClone(prev => prev ? { ...prev } : null)
+    // Actualizar posición del clone flotante
+    setDragClone(prev => prev ? { ...prev, x: e.clientX - state.offsetX, y: e.clientY - state.offsetY } : null)
+
+    // Hit-test por bounding rect — evita falsos positivos sobre el item invisible
+    const allItems = document.querySelectorAll('[data-drag-key]')
+    let foundKey = null
+    for (const el of allItems) {
+      const k = el.getAttribute('data-drag-key')
+      if (k === state.dragKey) continue // ignorar item arrastrado (invisible)
+      const r = el.getBoundingClientRect()
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        foundKey = k; break
       }
+    }
+
+    if (foundKey && foundKey !== state.dragOverKey) {
+      // Capturar posiciones actuales ANTES del re-render (paso "First" del FLIP)
+      const positions = {}
+      allItems.forEach(el => {
+        const k = el.getAttribute('data-drag-key')
+        if (k === state.dragKey) return
+        const r = el.getBoundingClientRect()
+        positions[k] = { x: r.left, y: r.top }
+      })
+      itemPositionsRef.current = positions
+      state.dragOverKey = foundKey
+      setDragOverKey(foundKey)
     }
   }, [])
 
@@ -524,7 +540,9 @@ export default function MainPage() {
     const state = dragStateRef.current
     if (!state) return
     commitDrag(state.dragKey, state.dragOverKey)
+    document.querySelectorAll('[data-drag-key]').forEach(el => { el.style.transform = ''; el.style.transition = '' })
     dragStateRef.current = null
+    itemPositionsRef.current = {}
     setDragKey(null)
     setDragOverKey(null)
     setDragClone(null)
@@ -542,6 +560,43 @@ export default function MainPage() {
       document.removeEventListener('pointercancel', handleDragPointerUp)
     }
   }, [dragClone, handleDragPointerMove, handleDragPointerUp])
+
+  // ── FLIP animation: anima items desde posición anterior a la nueva ────────
+  useLayoutEffect(() => {
+    if (!dragKey || !dragOverKey) return
+    const prevPositions = itemPositionsRef.current
+    if (Object.keys(prevPositions).length === 0) return
+
+    const allItems = document.querySelectorAll('[data-drag-key]')
+    const toAnimate = []
+
+    allItems.forEach(el => {
+      const k = el.getAttribute('data-drag-key')
+      if (k === dragKey) return // el item arrastrado es invisible, no animar
+      const prev = prevPositions[k]
+      if (!prev) return
+      const rect = el.getBoundingClientRect()
+      const dx = prev.x - rect.left
+      const dy = prev.y - rect.top
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) toAnimate.push({ el, dx, dy })
+    })
+
+    itemPositionsRef.current = {}
+    if (toAnimate.length === 0) return
+
+    // Invert: colocar en posición anterior sin transición
+    toAnimate.forEach(({ el, dx, dy }) => {
+      el.style.transition = 'none'
+      el.style.transform = `translate(${dx}px, ${dy}px)`
+    })
+    // Force reflow para que el browser registre el transform inicial
+    toAnimate[0].el.getBoundingClientRect()
+    // Play: animar hacia posición natural (sin transform)
+    toAnimate.forEach(({ el }) => {
+      el.style.transition = 'transform 0.2s cubic-bezier(0.2,0,0,1)'
+      el.style.transform = ''
+    })
+  }, [dragOverKey]) // eslint-disable-line
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
@@ -812,7 +867,6 @@ export default function MainPage() {
             const isFolderDropTarget = isFolder && dragOverFolder === item.data.id
             const isSelected = selectedKeys.has(key)
             const isDragging = dragKey === key
-            const isLandingSpot = !isDragging && !!dragKey && dragOverKey === key && !isFolderDropTarget
             return (
               <div key={key}
                 data-drag-key={key}
@@ -822,8 +876,7 @@ export default function MainPage() {
                 onPointerLeave={cancelLongPress}
                 style={{
                   opacity: isDragging ? 0 : 1,
-                  transition: dragKey ? 'opacity 0.12s, transform 0.18s cubic-bezier(0.2,0,0,1)' : undefined,
-                  transform: isLandingSpot ? 'scale(0.93)' : 'scale(1)',
+                  // transition y transform gestionados por FLIP (useLayoutEffect) — no poner aquí
                   position: 'relative',
                   animationDelay: dragKey ? '0ms' : `${idx * 35}ms`,
                 }}

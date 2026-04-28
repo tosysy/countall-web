@@ -9,7 +9,7 @@
 .title { font-size:22px; font-weight:700; color:var(--text-primary); }
 
 /* ── Search ─────────────────────────────────────────────────────────────────── */
-.searchWrap { padding:4px 12px 6px; flex-shrink:0; }
+.searchWrap { padding:8px 12px 4px; flex-shrink:0; }
 .searchBox {
   display:flex; align-items:center; gap:10px;
   background:var(--card-bg);

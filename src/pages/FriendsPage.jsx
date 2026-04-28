@@ -115,7 +115,24 @@ export default function FriendsPage() {
         <h1 className={styles.title}>Amigos</h1>
       </header>
 
-      {/* Search bar — siempre visible en la pestaña Amigos */}
+      {/* Tab bar */}
+      <div className={styles.tabs}>
+        <div className={styles.tabIndicator}
+          style={{ transform: `translateX(${{ friends:0, sent:1, received:2 }[tab] * 100}%)`, width: '33.33%' }} />
+        {[
+          { id:'friends', label:'Amigos' },
+          { id:'sent',    label:'Enviadas' },
+          { id:'received',label:'Recibidas' },
+        ].map(t => (
+          <button key={t.id} className={`${styles.tab} ${tab === t.id ? styles.active : ''}`}
+            onClick={() => { setTab(t.id); clearSearch() }}>
+            {t.label}
+            {t.id === 'received' && received.length > 0 && <span className={styles.tabBadge} />}
+          </button>
+        ))}
+      </div>
+
+      {/* Search bar — debajo de las pestañas, solo en Amigos */}
       {tab === 'friends' && (
         <div className={styles.searchWrap}>
           <div className={styles.searchBox}>
@@ -142,23 +159,6 @@ export default function FriendsPage() {
           </div>
         </div>
       )}
-
-      {/* Tab bar */}
-      <div className={styles.tabs}>
-        <div className={styles.tabIndicator}
-          style={{ transform: `translateX(${{ friends:0, sent:1, received:2 }[tab] * 100}%)`, width: '33.33%' }} />
-        {[
-          { id:'friends', label:'Amigos' },
-          { id:'sent',    label:'Enviadas' },
-          { id:'received',label:'Recibidas' },
-        ].map(t => (
-          <button key={t.id} className={`${styles.tab} ${tab === t.id ? styles.active : ''}`}
-            onClick={() => { setTab(t.id); clearSearch() }}>
-            {t.label}
-            {t.id === 'received' && received.length > 0 && <span className={styles.tabBadge} />}
-          </button>
-        ))}
-      </div>
 
       {/* Listas */}
       <div className={styles.list}>

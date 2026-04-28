@@ -72,16 +72,17 @@
 
 .heroTitleWrap { flex: 1; text-align: center; padding: 0 8px; overflow: hidden; }
 .heroName {
-  font-size: 15px; font-weight: 700; color: var(--text-primary);
+  font-size: 19px; font-weight: 700; color: var(--text-primary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 220px;
   display: flex; align-items: center; gap: 6px; justify-content: center;
+  width: 100%;
 }
 .heroNameInput {
-  font-size: 15px; font-weight: 700; color: var(--text-primary);
+  font-size: 19px; font-weight: 700; color: var(--text-primary);
   background: transparent; border: none;
   border-bottom: 2px solid var(--card-stroke);
-  text-align: center; outline: none; width: 160px;
+  text-align: center; outline: none; width: 180px;
 }
 .roleBadge { font-size: 16px; line-height: 1; }
 
@@ -89,12 +90,13 @@
 .heroCardName {
   position: absolute; top: 0; left: 0; right: 0;
   z-index: 3;
-  padding: 10px 14px 24px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.62) 0%, transparent 100%);
-  font-size: 13px; font-weight: 700;
+  padding: 14px 16px 28px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%);
+  font-size: 17px; font-weight: 700;
   color: #fff;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
-  display: flex; align-items: center; gap: 6px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   pointer-events: none;
 }

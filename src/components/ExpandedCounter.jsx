@@ -455,86 +455,144 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
           {/* ── Ajustes ── */}
           {tab === 'settings' && (
             <div className={styles.settingsTab}>
-              <div className={styles.settingRow}>
-                <label>Incremento</label>
-                <input className="input-field" type="number" inputMode="numeric" min="1"
-                  value={incrementInput} disabled={!canEdit}
-                  onChange={e => setIncrementInput(e.target.value)}
-                  onBlur={() => { const v = parseInt(incrementInput); setIncrementInput(String(isNaN(v)||v<1?1:v)) }}
-                  style={{ width: 100, textAlign: 'right' }} />
-              </div>
-              {!counter.isCompetitive && (
-                <div className={styles.settingRow}>
-                  <label>Objetivo</label>
-                  <input className="input-field" type="number" inputMode="numeric" min="1"
-                    value={targetInput} disabled={!canEdit}
-                    placeholder="Sin objetivo"
-                    onChange={e => setTargetInput(e.target.value)}
-                    onBlur={() => { if (targetInput!=='') { const v=parseInt(targetInput); setTargetInput(isNaN(v)||v<1?'':String(v)) } }}
-                    style={{ width: 120, textAlign: 'right' }} />
-                </div>
-              )}
 
-              {/* Modo competitivo toggle (solo owner de compartido) */}
-              {counter.isShared && isOwner && (
-                <div className={styles.settingRow}>
-                  <label>Modo competitivo</label>
-                  <button
-                    className={counter.isCompetitive ? 'btn-primary' : 'btn-ghost'}
-                    onClick={toggleCompetitive}
-                    style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13 }}
-                  >
-                    {counter.isCompetitive ? 'Activado' : 'Desactivado'}
-                  </button>
-                </div>
-              )}
-
-              {canEdit && (
-                <button className="btn-primary" style={{ width:'100%', marginTop: 4 }} onClick={saveSettings}>
-                  Guardar
-                </button>
-              )}
-
+              {/* ── APARIENCIA ── */}
               {canEdit && (
                 <>
-                  <p className={styles.settingLabel}>Color de fondo</p>
-                  <div className={styles.colorPreviewRow}>
-                    <div className={styles.colorPreviewSwatch}
-                      style={{ background: counter.color ?? 'var(--card-bg)', border: counter.color ? undefined : '2px solid var(--card-stroke)' }} />
-                    <button className="btn-ghost" style={{ flex:1 }} onClick={() => setShowColorPicker(true)}>
-                      {counter.color ? counter.color.toUpperCase() : 'Sin color'}
+                  <p className={styles.settingSection}>APARIENCIA</p>
+                  <div className={styles.settingCard}>
+                    {/* Color de fondo */}
+                    <button className={styles.settingCardRow} onClick={() => setShowColorPicker(true)}>
+                      <div className={styles.settingCardIcon}>
+                        <div className={styles.colorDot} style={{ background: counter.color || 'transparent', border: counter.color ? 'none' : '2px solid var(--card-stroke)' }} />
+                      </div>
+                      <span className={styles.settingCardLabel}>Color de fondo</span>
+                      <span className={styles.settingCardValue}>{counter.color ? counter.color.toUpperCase() : 'Sin color'}</span>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ color:'var(--text-secondary)', flexShrink:0 }}><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
                     </button>
-                  </div>
 
-                  <p className={styles.settingLabel}>Imagen de fondo</p>
-                  <div style={{ display:'flex', gap:8 }}>
-                    <button className={styles.settingBtn} style={{ flex:1 }} onClick={handleBgImage}>
-                      {(counter.backgroundImageLocal || counter.backgroundImageUrl) ? 'Cambiar imagen' : 'Añadir imagen'}
+                    <div className={styles.settingCardDivider} />
+
+                    {/* Imagen de fondo */}
+                    <button className={styles.settingCardRow} onClick={handleBgImage}>
+                      <div className={styles.settingCardIcon}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                      </div>
+                      <span className={styles.settingCardLabel}>
+                        {(counter.backgroundImageLocal || counter.backgroundImageUrl) ? 'Cambiar imagen' : 'Añadir imagen'}
+                      </span>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ color:'var(--text-secondary)', flexShrink:0 }}><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
                     </button>
+
+                    {/* Quitar imagen */}
                     {(counter.backgroundImageLocal || counter.backgroundImageUrl) && (
-                      <button className={styles.settingBtn} onClick={removeBg}>Quitar</button>
+                      <>
+                        <div className={styles.settingCardDivider} />
+                        <button className={styles.settingCardRow} onClick={removeBg}>
+                          <div className={styles.settingCardIcon}>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style={{ color:'var(--danger)' }}><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                          </div>
+                          <span className={styles.settingCardLabelDanger}>Quitar imagen</span>
+                        </button>
+                      </>
                     )}
                   </div>
-
-                  <button className={styles.settingBtn} style={{ width:'100%', marginTop: 4 }} onClick={handleReset}>
-                    Reiniciar contador
-                  </button>
                 </>
               )}
 
-              {/* Código de invitación */}
-              {counter.isShared && inviteCode && isOwner && (
+              {/* ── CONFIGURACIÓN ── */}
+              {canEdit && (
                 <>
-                  <p className={styles.settingLabel}>Código de invitación</p>
-                  <div className={styles.codeBox}>
-                    <div className={styles.codeRow}>
-                      <code className={styles.code}>{inviteCode}</code>
-                      <button className="btn-ghost" onClick={handleCopyCode}>Copiar</button>
-                      <button className="btn-ghost" onClick={() => setShowQr(v => !v)}>QR</button>
+                  <p className={styles.settingSection}>CONFIGURACIÓN</p>
+                  <div className={styles.settingCard}>
+                    {/* Incremento */}
+                    <div className={styles.settingCardRow}>
+                      <div className={styles.settingCardIcon}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      </div>
+                      <span className={styles.settingCardLabel}>Incremento</span>
+                      <input className={styles.settingCardInput} type="number" inputMode="numeric" min="1"
+                        value={incrementInput}
+                        onChange={e => setIncrementInput(e.target.value)}
+                        onBlur={() => { const v = parseInt(incrementInput); setIncrementInput(String(isNaN(v)||v<1?1:v)) }} />
+                    </div>
+
+                    {/* Objetivo */}
+                    {!counter.isCompetitive && (
+                      <>
+                        <div className={styles.settingCardDivider} />
+                        <div className={styles.settingCardRow}>
+                          <div className={styles.settingCardIcon}>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+                          </div>
+                          <span className={styles.settingCardLabel}>Objetivo</span>
+                          <input className={styles.settingCardInput} type="number" inputMode="numeric" min="1"
+                            value={targetInput} placeholder="—"
+                            onChange={e => setTargetInput(e.target.value)}
+                            onBlur={() => { if (targetInput!=='') { const v=parseInt(targetInput); setTargetInput(isNaN(v)||v<1?'':String(v)) } }} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <button className={styles.settingSaveBtn} onClick={saveSettings}>Guardar</button>
+                </>
+              )}
+
+              {/* ── MODO (solo owner compartido) ── */}
+              {counter.isShared && isOwner && (
+                <>
+                  <p className={styles.settingSection}>MODO</p>
+                  <div className={styles.settingCard}>
+                    <div className={styles.settingCardRow}>
+                      <div className={styles.settingCardIcon}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                      </div>
+                      <span className={styles.settingCardLabel}>Modo competitivo</span>
+                      <button
+                        className={`${styles.settingToggle} ${counter.isCompetitive ? styles.settingToggleOn : ''}`}
+                        onClick={toggleCompetitive}
+                      >
+                        <div className={styles.settingToggleThumb} />
+                      </button>
                     </div>
                   </div>
                 </>
               )}
+
+              {/* ── CÓDIGO DE INVITACIÓN ── */}
+              {counter.isShared && inviteCode && isOwner && (
+                <>
+                  <p className={styles.settingSection}>INVITACIÓN</p>
+                  <div className={styles.settingCard}>
+                    <div className={styles.settingCardRow} style={{ gap: 10 }}>
+                      <div className={styles.settingCardIcon}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+                      </div>
+                      <code style={{ flex:1, fontFamily:'monospace', fontSize:15, letterSpacing:2, color:'var(--text-primary)' }}>{inviteCode}</code>
+                      <button className="btn-ghost" style={{ padding:'6px 10px', fontSize:13 }} onClick={handleCopyCode}>Copiar</button>
+                      <button className="btn-ghost" style={{ padding:'6px 10px', fontSize:13 }} onClick={() => setShowQr(v => !v)}>QR</button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── ACCIONES ── */}
+              {canEdit && (
+                <>
+                  <p className={styles.settingSection}>ACCIONES</p>
+                  <button className={styles.settingDangerBtn} onClick={handleReset}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                    Reiniciar contador
+                  </button>
+                  {isOwner && (
+                    <button className={styles.settingDangerBtn} onClick={() => { onDelete() }}>
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                      Eliminar contador
+                    </button>
+                  )}
+                </>
+              )}
+
             </div>
           )}
 
@@ -603,8 +661,8 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
             right: menuPos.right,
             background: 'var(--card-bg)',
             border: '1px solid var(--card-stroke)',
-            borderRadius: 14,
-            minWidth: 190,
+            borderRadius: 16,
+            minWidth: 210,
             boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
             overflow: 'hidden',
             zIndex: 200,
@@ -616,6 +674,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
           {canEdit && (
             <button className="portal-menu-item" style={menuItemStyle}
               onClick={() => { setShowMenu(false); setTab('settings') }}>
+              <span style={menuIconStyle}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></span>
               Editar
             </button>
           )}
@@ -623,32 +682,41 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
           {counter.folderId && (
             <button className="portal-menu-item" style={menuItemStyle}
               onClick={() => { setShowMenu(false); onRemoveFromFolder?.() }}>
+              <span style={menuIconStyle}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg></span>
               Sacar de carpeta
             </button>
           )}
-          {/* Compartir / Dejar de compartir / Abandonar */}
+          {/* Compartir */}
           {!counter.isShared && isOwner && (
             <button className="portal-menu-item" style={menuItemStyle}
               onClick={handleShare} disabled={loading}>
+              <span style={menuIconStyle}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg></span>
               Compartir
             </button>
           )}
+          {/* Dejar de compartir */}
           {counter.isShared && isOwner && (
             <button className="portal-menu-item" style={menuItemStyle}
               onClick={handleUnshare} disabled={loading}>
+              <span style={menuIconStyle}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7l.01-.03-1.99-1.99C6.47 10.58 6 11.24 6 12c0 1.66 1.34 3 3 3 .79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92zM20.71 5.63l-1.41-1.41-16.6 16.6 1.41 1.41 3.37-3.37.01.01.54.31c.53.29 1.1.54 1.72.65V21h4v-2.18c1.86-.35 3.43-1.42 4.48-2.93l1.56.9 1.41-1.41-1.47-1.47 1.47-1.47zM19 3c-1.66 0-3 1.34-3 3 0 .24.04.47.09.7L8.04 10.81C7.5 10.31 6.79 10 6 10c-.28 0-.54.04-.8.1L3.27 8.17C3.1 8.48 3 8.72 3 9c0 1.66 1.34 3 3 3 .79 0 1.5-.31 2.04-.81l7.05 4.11c-.05.23-.09.46-.09.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/></svg></span>
               Dejar de compartir
             </button>
           )}
+          {/* Abandonar */}
           {counter.isShared && !isOwner && (
             <button className="portal-menu-item" style={{ ...menuItemStyle, color: 'var(--danger)' }}
               onClick={handleAbandon} disabled={loading}>
+              <span style={{ ...menuIconStyle, color: 'var(--danger)' }}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg></span>
               Abandonar
             </button>
           )}
+          {/* Separador antes de Eliminar */}
+          {isOwner && <div style={{ height:1, background:'var(--card-stroke)', margin:'0 12px' }} />}
           {/* Eliminar */}
           {isOwner && (
             <button className="portal-menu-item" style={{ ...menuItemStyle, color: 'var(--danger)' }}
               onClick={() => { setShowMenu(false); onDelete() }}>
+              <span style={{ ...menuIconStyle, color: 'var(--danger)' }}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></span>
               Eliminar
             </button>
           )}
@@ -671,10 +739,18 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
 }
 
 const menuItemStyle = {
-  display: 'block', width: '100%',
-  padding: '12px 16px', textAlign: 'left',
-  fontSize: 14, color: 'var(--text-primary)',
+  display: 'flex', alignItems: 'center', gap: 12,
+  width: '100%',
+  padding: '13px 16px', textAlign: 'left',
+  fontSize: 14, fontWeight: 500, color: 'var(--text-primary)',
   background: 'none', border: 'none', cursor: 'pointer',
   fontFamily: 'inherit',
   transition: 'background 0.1s',
+}
+
+const menuIconStyle = {
+  width: 34, height: 34, borderRadius: 10,
+  background: 'var(--log-card-bg)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  color: 'var(--text-secondary)', flexShrink: 0,
 }

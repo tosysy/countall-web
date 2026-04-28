@@ -269,18 +269,10 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
     <div className={styles.backdrop} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className={styles.panel}>
 
-        {/* ── HERO ─────────────────────────────────────────────────────── */}
-        <div
-          className={styles.hero}
-          style={{
-            backgroundColor: cardColor || 'var(--card-bg)',
-            backgroundImage: bg ? `url(${bg})` : undefined,
-            backgroundSize: 'cover', backgroundPosition: 'center',
-          }}
-        >
-          {(bg || cardColor) && <div className={styles.heroOverlay} />}
+        {/* ── HERO WRAP — zona gris con padding alrededor de la tarjeta ── */}
+        <div className={styles.heroWrap}>
 
-          {/* Top controls */}
+          {/* Barra superior: cerrar · título · menú (sobre fondo del panel) */}
           <div className={styles.heroTop}>
             <button className={styles.heroBtn} onClick={onClose} aria-label="Cerrar">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -301,7 +293,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               )}
             </div>
 
-            {/* ⋮ menu — dropdown en portal para no ser cortado por overflow:hidden */}
+            {/* ⋮ menu */}
             <div ref={menuRef}>
               <button className={styles.heroBtn} aria-label="Menú"
                 onClick={() => {
@@ -318,42 +310,62 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
             </div>
           </div>
 
-          {/* Value */}
-          <div className={styles.heroBody}>
-            {editValue ? (
-              <input className={styles.heroValueInput} type="number" inputMode="numeric" value={valueInput} autoFocus
-                onChange={e => setValueInput(e.target.value)}
-                onBlur={saveValue} onKeyDown={e => e.key === 'Enter' && saveValue()} />
-            ) : (
-              <button className={styles.heroValue} onClick={() => canEdit && !counter.isCompetitive && setEditValue(true)}>
-                {displayValue}
-              </button>
-            )}
-            {/* Own score in competitive mode */}
-            {counter.isCompetitive && myUid && (
-              <p className={styles.heroOwnScore}>tú: {myScore}</p>
-            )}
-            {counter.target != null && !counter.isCompetitive && (
-              <p className={styles.heroTarget}>/ {counter.target}</p>
-            )}
-            {/* Trophy when goal reached */}
-            {!counter.isCompetitive && counter.target != null && counter.value >= counter.target && (
-              <span className={styles.heroTrophy}>🏆</span>
+          {/* ── Tarjeta del contador ─── */}
+          <div
+            className={styles.hero}
+            style={{
+              backgroundColor: cardColor || 'var(--card-bg)',
+              backgroundImage: bg ? `url(${bg})` : undefined,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+            }}
+          >
+            {(bg || cardColor) && <div className={styles.heroOverlay} />}
+
+            {/* Nombre dentro de la tarjeta con gradiente superior */}
+            <div className={styles.heroCardName}>
+              <span>{counter.name}</span>
+              {counter.isShared && ROLE_BADGE[counter.role] && (
+                <span className={styles.roleBadge}>{ROLE_BADGE[counter.role]}</span>
+              )}
+            </div>
+
+            {/* Valor centrado */}
+            <div className={styles.heroBody}>
+              {editValue ? (
+                <input className={styles.heroValueInput} type="number" inputMode="numeric" value={valueInput} autoFocus
+                  onChange={e => setValueInput(e.target.value)}
+                  onBlur={saveValue} onKeyDown={e => e.key === 'Enter' && saveValue()} />
+              ) : (
+                <button key={displayValue} className={styles.heroValue}
+                  style={!(bg || cardColor) ? { color: 'var(--text-primary)', textShadow: 'none' } : {}}
+                  onClick={() => canEdit && !counter.isCompetitive && setEditValue(true)}>
+                  {displayValue}
+                </button>
+              )}
+              {counter.isCompetitive && myUid && (
+                <p className={styles.heroOwnScore} style={!(bg || cardColor) ? { color: 'var(--text-secondary)' } : {}}>tú: {myScore}</p>
+              )}
+              {counter.target != null && !counter.isCompetitive && (
+                <p className={styles.heroTarget} style={!(bg || cardColor) ? { color: 'var(--text-secondary)' } : {}}>/ {counter.target}</p>
+              )}
+              {!counter.isCompetitive && counter.target != null && counter.value >= counter.target && (
+                <span className={styles.heroTrophy}>🏆</span>
+              )}
+            </div>
+
+            {/* Botones +/- dentro de la tarjeta */}
+            {canEdit && (
+              <div className={styles.heroButtons}>
+                <button className={styles.heroMinus} style={heroBtnMinusStyle} onClick={onDecrement} onContextMenu={e => e.preventDefault()}>
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+                </button>
+                <button className={styles.heroPlus} style={heroBtnPlusStyle} onClick={onIncrement} onContextMenu={e => e.preventDefault()}>
+                  <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+              </div>
             )}
           </div>
-
-          {/* +/- buttons */}
-          {canEdit && (
-            <div className={styles.heroButtons}>
-              <button className={styles.heroMinus} style={heroBtnMinusStyle} onClick={onDecrement} onContextMenu={e => e.preventDefault()}>
-                <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
-              </button>
-              <button className={styles.heroPlus} style={heroBtnPlusStyle} onClick={onIncrement} onContextMenu={e => e.preventDefault()}>
-                <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              </button>
-            </div>
-          )}
-        </div>
+        </div>{/* end heroWrap */}
 
         {/* ── QR ───────────────────────────────────────────────────────── */}
         {showQr && inviteCode && (

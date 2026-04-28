@@ -12,6 +12,7 @@ import {
   shareFolder, unshareFolder, getFolderInviteCode, getFolderMembers,
   setFolderMemberRole, removeFolderMember,
   listenSharedFolder, pushFolderUpdate,
+  getInviteCode, getMembers,
 } from '../firebase/syncManager'
 import { uploadBackground as storageUpload, folderPath } from '../firebase/storageManager'
 import styles from './MainPage.module.css'
@@ -55,6 +56,7 @@ export default function MainPage() {
   const [expandedShowMenu, setExpandedShowMenu] = useState(false)
   const [expandedInitialTab, setExpandedInitialTab] = useState('log')
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
+  const [sharedInfoSheet, setSharedInfoSheet] = useState(null) // { counter, inviteCode, members }
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
   const [editFolderColor, setEditFolderColor] = useState(null)
@@ -501,6 +503,15 @@ export default function MainPage() {
     driveToken
   )
 
+  const openSharedInfo = async (counter) => {
+    setSharedInfoSheet({ counter, inviteCode: null, members: [] })
+    const [code, members] = await Promise.all([
+      counter.role === 'owner' ? getInviteCode(counter.sharedId).catch(() => null) : Promise.resolve(null),
+      getMembers(counter.sharedId).catch(() => []),
+    ])
+    setSharedInfoSheet(prev => prev ? { ...prev, inviteCode: code, members } : null)
+  }
+
   // ── Folder management ─────────────────────────────────────────────────────
   const handleFolderMenu = (folder) => {
     setEditingFolder(folder)
@@ -751,6 +762,7 @@ export default function MainPage() {
                       const r = e.currentTarget.getBoundingClientRect()
                       setCounterMenu({ counter: c, top: r.bottom + 4, right: window.innerWidth - r.right })
                     } : undefined}
+                    onSharedBadge={!selectionMode ? (c) => openSharedInfo(c) : undefined}
                   />
                 ) : (
                   <FolderCard
@@ -1145,6 +1157,80 @@ export default function MainPage() {
           </div>
         </>
       )}
+
+      {/* ── Hoja de info compartida ──────────────────────────────────────── */}
+      {sharedInfoSheet && (() => {
+        const { counter, inviteCode, members } = sharedInfoSheet
+        const INVITE_BASE = 'https://tosysy.github.io/countall-web/?code='
+        const qrUrl = inviteCode
+          ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=ffffff&color=000000&data=${encodeURIComponent(INVITE_BASE + inviteCode)}`
+          : null
+        const ROLE_LABEL = { owner: 'Propietario', editor: 'Editor', viewer: 'Lector' }
+        const ROLE_ICON  = { owner: '👑', editor: '✏️', viewer: '👁️' }
+        return (
+          <div className="dialog-backdrop" onClick={() => setSharedInfoSheet(null)}>
+            <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+
+              {/* QR */}
+              {qrUrl ? (
+                <img src={qrUrl} alt="QR"
+                  style={{ width: 160, height: 160, borderRadius: 12, margin: '0 auto 8px', display: 'block' }} />
+              ) : (
+                <div style={{ width: 160, height: 160, borderRadius: 12, margin: '0 auto 8px',
+                  background: 'var(--log-card-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {inviteCode === undefined ? 'Cargando…' : 'Solo el propietario\npuede ver el QR'}
+                  </span>
+                </div>
+              )}
+
+              {/* Código */}
+              {inviteCode && (
+                <code style={{ fontSize: 18, fontWeight: 800, letterSpacing: 3,
+                  color: 'var(--text-primary)', fontFamily: 'monospace', display: 'block', marginBottom: 4 }}>
+                  {inviteCode}
+                </code>
+              )}
+
+              {/* Separador */}
+              <div style={{ height: 1, background: 'var(--card-stroke)', margin: '12px 0' }} />
+
+              {/* Miembros */}
+              <div style={{ textAlign: 'left' }}>
+                {members.length === 0
+                  ? <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '8px 0' }}>Cargando miembros…</p>
+                  : members.map(m => (
+                    <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0',
+                      borderBottom: '1px solid var(--card-stroke)' }}>
+                      <span style={{ fontSize: 16 }}>{ROLE_ICON[m.role] ?? '👤'}</span>
+                      <span style={{ flex: 1, fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>{m.username}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ROLE_LABEL[m.role] ?? m.role}</span>
+                    </div>
+                  ))
+                }
+              </div>
+
+              {/* Acciones */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button className="btn-ghost" style={{ flex: 1 }}
+                  onClick={() => setSharedInfoSheet(null)}>
+                  Cerrar
+                </button>
+                {inviteCode && (
+                  <button className="btn-primary" style={{ flex: 1 }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(INVITE_BASE + inviteCode).catch(() => {})
+                      showToast('Enlace copiado ✓')
+                      setSharedInfoSheet(null)
+                    }}>
+                    Copiar enlace
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}

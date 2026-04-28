@@ -272,6 +272,31 @@
 .memberRole { font-size: 12px; color: var(--text-secondary); }
 .roleSelect { font-size: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-family: inherit; }
 
+/* ── Action group (imagen / reiniciar) ───────────────────────────────────── */
+.actionGroup {
+  border: 2px solid var(--btn-plus);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.actionGroupBtn {
+  display: block; width: 100%;
+  padding: 12px 16px; text-align: left;
+  font-size: 14px; font-weight: 600;
+  color: var(--btn-plus);
+  background: none; border: none; cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.actionGroupBtn:hover { background: rgba(74,144,226,0.08); }
+.actionGroupBtnDanger { color: var(--danger) !important; }
+.actionGroupBtnDanger:hover { background: rgba(244,67,54,0.07) !important; }
+.actionGroupDivider {
+  height: 1px;
+  background: var(--btn-plus);
+  opacity: 0.25;
+}
+
 /* ── Toast ────────────────────────────────────────────────────────────────── */
 .toast {
   position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);

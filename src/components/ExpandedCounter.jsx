@@ -506,19 +506,23 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                     </button>
                   </div>
 
-                  <p className={styles.settingLabel}>Imagen de fondo</p>
-                  <div style={{ display:'flex', gap:8 }}>
-                    <button className="btn-ghost" style={{ flex:1 }} onClick={handleBgImage}>
+                  <div className={styles.actionGroup}>
+                    <button className={styles.actionGroupBtn} onClick={handleBgImage}>
                       {(counter.backgroundImageLocal || counter.backgroundImageUrl) ? 'Cambiar imagen' : 'Añadir imagen'}
                     </button>
                     {(counter.backgroundImageLocal || counter.backgroundImageUrl) && (
-                      <button className="btn-ghost" onClick={removeBg}>Quitar</button>
+                      <>
+                        <div className={styles.actionGroupDivider} />
+                        <button className={styles.actionGroupBtn} onClick={removeBg}>
+                          Quitar imagen
+                        </button>
+                      </>
                     )}
+                    <div className={styles.actionGroupDivider} />
+                    <button className={`${styles.actionGroupBtn} ${styles.actionGroupBtnDanger}`} onClick={handleReset}>
+                      Reiniciar contador
+                    </button>
                   </div>
-
-                  <button className="btn-ghost" style={{ width:'100%', marginTop: 4 }} onClick={handleReset}>
-                    Reiniciar contador
-                  </button>
                 </>
               )}
 

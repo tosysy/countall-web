@@ -24,7 +24,7 @@ function luminance(hex) {
   return 0.299*r + 0.587*g + 0.114*b
 }
 
-export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false, onRemoveFromFolder }) {
+export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false, initialTab = 'log', onRemoveFromFolder }) {
   const { user, username, driveToken } = useAppStore()
 
   const isOwner = counter.role === 'owner'
@@ -46,7 +46,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
     ...(counter.isShared ? ['members'] : []),
   ]
   const tabLabels = { log: 'Notas', competitive: 'Podio', settings: 'Ajustes', members: 'Miembros' }
-  const [tab, setTab] = useState('log')
+  const [tab, setTab] = useState(initialTab)
 
   // Hero states
   const [showMenu, setShowMenu]         = useState(initialShowMenu)

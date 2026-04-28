@@ -53,6 +53,7 @@ export default function MainPage() {
   const [dragOverKey, setDragOverKey] = useState(null)
   const [dragOverFolder, setDragOverFolder] = useState(null)
   const [expandedShowMenu, setExpandedShowMenu] = useState(false)
+  const [expandedInitialTab, setExpandedInitialTab] = useState('log')
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
@@ -745,7 +746,7 @@ export default function MainPage() {
                     counter={item.data}
                     onIncrement={() => !selectionMode && handleIncrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onDecrement={() => !selectionMode && handleDecrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
-                    onClick={(c) => selectionMode ? toggleSelect(key) : setExpanded(c)}
+                    onClick={(c) => selectionMode ? toggleSelect(key) : (setExpandedInitialTab('log'), setExpanded(c))}
                     onMenu={!selectionMode ? (c, e) => {
                       const r = e.currentTarget.getBoundingClientRect()
                       setCounterMenu({ counter: c, top: r.bottom + 4, right: window.innerWidth - r.right })
@@ -1048,12 +1049,13 @@ export default function MainPage() {
       {expanded && (
         <ExpandedCounter
           counter={expanded}
-          onClose={() => { setExpanded(null); setExpandedShowMenu(false) }}
+          onClose={() => { setExpanded(null); setExpandedShowMenu(false); setExpandedInitialTab('log') }}
           onUpdate={handleCounterUpdate}
           onDelete={() => handleDelete(expanded)}
           onIncrement={() => { const p = handleIncrement(expanded); if (p) setExpanded(prev => ({ ...prev, ...p })) }}
           onDecrement={() => { const p = handleDecrement(expanded); if (p) setExpanded(prev => ({ ...prev, ...p })) }}
           initialShowMenu={expandedShowMenu}
+          initialTab={expandedInitialTab}
           onRemoveFromFolder={() => handleRemoveFromFolder(expanded)}
         />
       )}
@@ -1107,9 +1109,9 @@ export default function MainPage() {
             animation: 'scaleIn 0.15s ease',
             transformOrigin: 'top right',
           }}>
-            {/* Editar → abre el contador ampliado */}
+            {/* Editar → abre el contador ampliado en Ajustes */}
             <button className="portal-menu-item" style={cMenuStyle}
-              onClick={() => { setExpanded(counterMenu.counter); setCounterMenu(null) }}>
+              onClick={() => { setExpandedInitialTab('settings'); setExpanded(counterMenu.counter); setCounterMenu(null) }}>
               Editar
             </button>
             {/* Sacar de carpeta */}
@@ -1122,13 +1124,13 @@ export default function MainPage() {
             {/* Compartir */}
             {!counterMenu.counter.isShared && (
               <button className="portal-menu-item" style={cMenuStyle}
-                onClick={() => { setExpanded(counterMenu.counter); setCounterMenu(null) }}>
+                onClick={() => { setExpandedInitialTab('settings'); setExpanded(counterMenu.counter); setCounterMenu(null) }}>
                 Compartir
               </button>
             )}
             {counterMenu.counter.isShared && counterMenu.counter.role === 'owner' && (
               <button className="portal-menu-item" style={cMenuStyle}
-                onClick={() => { setExpanded(counterMenu.counter); setCounterMenu(null) }}>
+                onClick={() => { setExpandedInitialTab('settings'); setExpanded(counterMenu.counter); setCounterMenu(null) }}>
                 Dejar de compartir
               </button>
             )}

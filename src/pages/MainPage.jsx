@@ -435,6 +435,21 @@ export default function MainPage() {
 
   const resetDrag = () => { setDragKey(null); setDragOverKey(null); setDragOverFolder(null) }
 
+  // Reordena items en vivo mientras se arrastra — muestra dónde caería el elemento
+  const getLiveItems = (baseItems) => {
+    if (!dragKey || !dragOverKey || dragKey === dragOverKey) return baseItems
+    // No reordenar si el destino es una carpeta (es un drop "dentro")
+    const overItem = baseItems.find(i => getItemKey(i) === dragOverKey)
+    if (overItem?.type === 'folder' && dragKey.startsWith('C:')) return baseItems
+    const fromIdx = baseItems.findIndex(i => getItemKey(i) === dragKey)
+    const toIdx   = baseItems.findIndex(i => getItemKey(i) === dragOverKey)
+    if (fromIdx === -1 || toIdx === -1) return baseItems
+    const next = [...baseItems]
+    const [moved] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    return next
+  }
+
   const handleDragStart = (e, item) => {
     setDragKey(getItemKey(item))
     e.dataTransfer.effectAllowed = 'move'
@@ -756,11 +771,13 @@ export default function MainPage() {
         </div>
       ) : (
         <div key={currentFolderId ?? 'root'} className="counter-grid">
-          {items.map((item, idx) => {
+          {getLiveItems(items).map((item, idx) => {
             const key = getItemKey(item)
             const isFolder = item.type === 'folder'
             const isFolderDropTarget = isFolder && dragOverFolder === item.data.id
             const isSelected = selectedKeys.has(key)
+            const isDragging = dragKey === key
+            const isLandingSpot = !isDragging && dragKey && dragOverKey === key && !isFolderDropTarget
             return (
               <div key={key}
                 className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
@@ -772,7 +789,13 @@ export default function MainPage() {
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
-                style={{ opacity: dragKey === key ? 0.45 : 1, transition: 'opacity 0.15s', position: 'relative', animationDelay: `${idx * 35}ms` }}
+                style={{
+                  opacity: isDragging ? 0 : 1,
+                  transition: 'opacity 0.12s, transform 0.15s cubic-bezier(0.2,0,0,1)',
+                  transform: isLandingSpot ? 'scale(0.94)' : 'scale(1)',
+                  position: 'relative',
+                  animationDelay: dragKey ? '0ms' : `${idx * 35}ms`,
+                }}
               >
                 {item.type === 'counter' ? (
                   <CounterCard

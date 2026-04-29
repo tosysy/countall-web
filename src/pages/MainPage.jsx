@@ -448,16 +448,24 @@ export default function MainPage() {
   // Reordena items en vivo mientras se arrastra
   const getLiveItems = (baseItems) => {
     const dk = dragStateRef.current?.dragKey
-    const dok = dragStateRef.current?.dragOverKey
-    if (!dk || !dok || dk === dok) return baseItems
-    const overItem = baseItems.find(i => getItemKey(i) === dok)
-    if (overItem?.type === 'folder' && dk.startsWith('C:')) return baseItems
+    if (!dk) return baseItems
     const fromIdx = baseItems.findIndex(i => getItemKey(i) === dk)
-    const toIdx   = baseItems.findIndex(i => getItemKey(i) === dok)
-    if (fromIdx === -1 || toIdx === -1) return baseItems
+    if (fromIdx === -1) return baseItems
+
+    // Siempre quitar el item arrastrado de su posición original
     const next = [...baseItems]
-    const [moved] = next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, moved)
+    const [dragged] = next.splice(fromIdx, 1)
+
+    // Si hay un target distinto, insertar placeholder invisible en esa posición
+    const dok = dragStateRef.current?.dragOverKey
+    if (dok && dok !== dk) {
+      const overItem = next.find(i => getItemKey(i) === dok)
+      if (!(overItem?.type === 'folder' && dk.startsWith('C:'))) {
+        const toIdx = next.findIndex(i => getItemKey(i) === dok)
+        if (toIdx !== -1) next.splice(toIdx, 0, dragged)
+      }
+    }
+    // Si dk===dok (justo al empezar), el item NO aparece en ningún lado → los demás se cierran
     return next
   }
 
@@ -484,21 +492,24 @@ export default function MainPage() {
     e.preventDefault()
     e.stopPropagation()
     const key = getItemKey(item)
-    // Buscar el grid-item contenedor
     const gridEl = document.querySelector(`[data-drag-key="${key}"]`)
     if (!gridEl) return
     const rect = gridEl.getBoundingClientRect()
-    const state = {
-      dragKey: key,
-      dragOverKey: key,
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top,
-    }
-    dragStateRef.current = state
+
+    // Capturar posiciones ANTES de quitar el item del grid (FLIP para cierre inicial)
+    const positions = {}
+    document.querySelectorAll('[data-drag-key]').forEach(el => {
+      const k = el.getAttribute('data-drag-key')
+      if (k === key) return
+      const r = el.getBoundingClientRect()
+      positions[k] = { x: r.left, y: r.top }
+    })
+    itemPositionsRef.current = positions
+
+    dragStateRef.current = { dragKey: key, dragOverKey: key, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
     setDragKey(key)
     setDragOverKey(key)
     setDragClone({ item, x: rect.left, y: rect.top, width: rect.width, height: rect.height })
-    // Capturar puntero para recibir eventos aunque salga del elemento
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
   }
 
@@ -596,7 +607,7 @@ export default function MainPage() {
       el.style.transition = 'transform 0.2s cubic-bezier(0.2,0,0,1)'
       el.style.transform = ''
     })
-  }, [dragOverKey]) // eslint-disable-line
+  }, [dragKey, dragOverKey]) // eslint-disable-line
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return

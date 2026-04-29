@@ -887,7 +887,9 @@ export default function MainPage() {
                 onPointerLeave={cancelLongPress}
                 style={{
                   opacity: isDragging ? 0 : 1,
-                  // transition y transform gestionados por FLIP (useLayoutEffect) — no poner aquí
+                  // animation: none evita que cardEnter sobreescriba opacity:0 al reinsertar el placeholder
+                  animation: isDragging ? 'none' : undefined,
+                  pointerEvents: isDragging ? 'none' : undefined,
                   position: 'relative',
                   animationDelay: dragKey ? '0ms' : `${idx * 35}ms`,
                 }}

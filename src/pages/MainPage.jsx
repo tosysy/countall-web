@@ -520,15 +520,29 @@ export default function MainPage() {
     // Actualizar posición del clone flotante
     setDragClone(prev => prev ? { ...prev, x: e.clientX - state.offsetX, y: e.clientY - state.offsetY } : null)
 
-    // Hit-test por bounding rect — evita falsos positivos sobre el item invisible
+    // Hit-test: 1) overlap directo, 2) item más cercano para espacios vacíos/fin de fila
     const allItems = document.querySelectorAll('[data-drag-key]')
     let foundKey = null
+
     for (const el of allItems) {
       const k = el.getAttribute('data-drag-key')
-      if (k === state.dragKey) continue // ignorar item arrastrado (invisible)
+      if (k === state.dragKey) continue
       const r = el.getBoundingClientRect()
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
         foundKey = k; break
+      }
+    }
+
+    // Sin overlap directo → usar el item cuyo centro esté más cerca del puntero
+    // Esto permite arrastrar al hueco al final de la fila o a filas vacías
+    if (!foundKey) {
+      let minDist = Infinity
+      for (const el of allItems) {
+        const k = el.getAttribute('data-drag-key')
+        if (k === state.dragKey) continue
+        const r = el.getBoundingClientRect()
+        const dist = Math.hypot(e.clientX - (r.left + r.right) / 2, e.clientY - (r.top + r.bottom) / 2)
+        if (dist < minDist) { minDist = dist; foundKey = k }
       }
     }
 

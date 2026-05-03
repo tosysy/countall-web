@@ -500,15 +500,10 @@ export default function MainPage() {
     if (!gridEl) return
     const rect = gridEl.getBoundingClientRect()
 
-    // Capturar posiciones ANTES de quitar el item del grid (FLIP para cierre inicial)
-    const positions = {}
-    document.querySelectorAll('[data-drag-key]').forEach(el => {
-      const k = el.getAttribute('data-drag-key')
-      if (k === key) return
-      const r = el.getBoundingClientRect()
-      positions[k] = { x: r.left, y: r.top }
-    })
-    itemPositionsRef.current = positions
+    // NO capturamos posiciones aquí: el reencuadre inicial (al quitar el item)
+    // es instantáneo (sin FLIP) para que getBoundingClientRect nunca devuelva
+    // posiciones a mitad de animación durante el drag.
+    itemPositionsRef.current = {}
 
     dragStateRef.current = { dragKey: key, dragOverKey: key, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
     setDragKey(key)
@@ -580,7 +575,16 @@ export default function MainPage() {
     }
 
     if (foundKey && foundKey !== state.dragOverKey) {
-      // Capturar posiciones actuales ANTES del re-render (paso "First" del FLIP)
+      // Cancelar cualquier FLIP en curso antes de leer posiciones,
+      // así getBoundingClientRect devuelve la posición de layout final (no mid-animación).
+      allItems.forEach(el => {
+        if (el.style.transition) {
+          el.style.transition = 'none'
+          el.style.transform   = ''
+        }
+      })
+
+      // Capturar posiciones estables ANTES del re-render (paso "First" del FLIP)
       const positions = {}
       allItems.forEach(el => {
         const k = el.getAttribute('data-drag-key')

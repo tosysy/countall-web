@@ -246,6 +246,9 @@ export default function App() {
 
     const handleUser = async (user) => {
       if (!user) {
+        // Resetear el flag para que el próximo inicio de sesión (en la misma sesión
+        // de navegador, sin recargar) ejecute initPersonalSync y descargue los datos.
+        tokenRefreshedRef.current = false
         clearData()
         navigate('/login', { replace: true })
         return

@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteText, setDeleteText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [hideSyncNotif, setHideSyncNotif] = useState(false)
 
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(null), 3000) }
@@ -48,8 +49,11 @@ export default function SettingsPage() {
   }
 
   const handleSignOut = async () => {
+    setSigningOut(true)
     await firebaseSignOut()
     clearData()
+    // Pequeño delay para que la animación de salida se vea antes de navegar
+    await new Promise(r => setTimeout(r, 350))
     navigate('/login', { replace: true })
   }
 
@@ -123,11 +127,14 @@ export default function SettingsPage() {
           <div className={styles.divider} />
 
           {/* Sign out */}
-          <button className={styles.rowBtn} onClick={handleSignOut}>
+          <button className={styles.rowBtn} onClick={handleSignOut} disabled={signingOut}>
             <div className={styles.iconTriangleRed}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+              {signingOut
+                ? <span className="spinner" style={{ width: 16, height: 16 }} />
+                : <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+              }
             </div>
-            <span className={styles.rowDanger}>Cerrar sesión de Google</span>
+            <span className={styles.rowDanger}>{signingOut ? 'Cerrando sesión…' : 'Cerrar sesión de Google'}</span>
           </button>
         </div>
 

@@ -53,6 +53,7 @@ export default function MainPage() {
   const [friendBadge, setFriendBadge] = useState(false)
   const [dragKey, setDragKey] = useState(null)
   const [dragOverKey, setDragOverKey] = useState(null)
+  const [dragInsertAfter, setDragInsertAfter] = useState(false)
   const [dragOverFolder, setDragOverFolder] = useState(null)
   // dragClone: { item, x, y, width, height } — clone flotante que sigue el puntero
   const [dragClone, setDragClone] = useState(null)
@@ -439,7 +440,7 @@ export default function MainPage() {
 
   const resetDrag = () => {
     document.querySelectorAll('[data-drag-key]').forEach(el => { el.style.transform = ''; el.style.transition = '' })
-    setDragKey(null); setDragOverKey(null); setDragOverFolder(null); setDragClone(null)
+    setDragKey(null); setDragOverKey(null); setDragInsertAfter(false); setDragOverFolder(null); setDragClone(null)
     dragStateRef.current = null; itemPositionsRef.current = {}
   }
 
@@ -456,20 +457,21 @@ export default function MainPage() {
     const next = [...baseItems]
     const [dragged] = next.splice(fromIdx, 1)
 
-    // Si hay un target distinto, insertar placeholder invisible en esa posición
+    // Si hay un target distinto, insertar placeholder en la posición correcta
     const dok = dragStateRef.current?.dragOverKey
+    const insertAfter = dragStateRef.current?.insertAfter ?? false
     if (dok && dok !== dk) {
       const overItem = next.find(i => getItemKey(i) === dok)
       if (!(overItem?.type === 'folder' && dk.startsWith('C:'))) {
         const toIdx = next.findIndex(i => getItemKey(i) === dok)
-        if (toIdx !== -1) next.splice(toIdx, 0, dragged)
+        if (toIdx !== -1) next.splice(insertAfter ? toIdx + 1 : toIdx, 0, dragged)
       }
     }
     // Si dk===dok (justo al empezar), el item NO aparece en ningún lado → los demás se cierran
     return next
   }
 
-  const commitDrag = (finalDragKey, finalOverKey) => {
+  const commitDrag = (finalDragKey, finalOverKey, finalInsertAfter) => {
     if (!finalDragKey || !finalOverKey || finalDragKey === finalOverKey) return
     const currentOrder = currentFolderId
       ? [...(folderOrders[currentFolderId] ?? [])]
@@ -479,11 +481,10 @@ export default function MainPage() {
     if (fromIdx === -1 || toIdx === -1) return
     const newOrder = [...currentOrder]
     newOrder.splice(fromIdx, 1)
-    // Ajustar toIdx tras la eliminación para que sea consistente con getLiveItems
-    // (getLiveItems busca el target en el array post-eliminación, así que si el target
-    //  estaba después del origen, su índice bajó en 1)
+    // Ajustar toIdx tras la eliminación del origen
     const adjustedToIdx = toIdx > fromIdx ? toIdx - 1 : toIdx
-    newOrder.splice(adjustedToIdx, 0, finalDragKey)
+    // insertAfter: insertar una posición después del target
+    newOrder.splice(finalInsertAfter ? adjustedToIdx + 1 : adjustedToIdx, 0, finalDragKey)
     if (currentFolderId) setFolderOrder(currentFolderId, newOrder)
     else setGridOrder(newOrder)
     push()
@@ -505,7 +506,7 @@ export default function MainPage() {
     // posiciones a mitad de animación durante el drag.
     itemPositionsRef.current = {}
 
-    dragStateRef.current = { dragKey: key, dragOverKey: key, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
+    dragStateRef.current = { dragKey: key, dragOverKey: key, insertAfter: false, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
     setDragKey(key)
     setDragOverKey(key)
     setDragClone({ item, x: rect.left, y: rect.top, width: rect.width, height: rect.height })
@@ -521,6 +522,7 @@ export default function MainPage() {
 
     const allItems = document.querySelectorAll('[data-drag-key]')
     let foundKey = null
+    let foundInsertAfter = false
 
     // 1) Overlap directo con algún item
     for (const el of allItems) {
@@ -528,7 +530,10 @@ export default function MainPage() {
       if (k === state.dragKey) continue
       const r = el.getBoundingClientRect()
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-        foundKey = k; break
+        foundKey = k
+        // Mitad derecha del item → insertar después; mitad izquierda → antes
+        foundInsertAfter = e.clientX > (r.left + r.right) / 2
+        break
       }
     }
 
@@ -545,38 +550,41 @@ export default function MainPage() {
 
       if (itemRects.length > 0) {
         // Detección de fila ESTRICTA: solo items cuyo rango vertical contiene exactamente pY.
-        // Sin tolerancia para que filas adyacentes nunca se mezclen.
         const sameRow = itemRects.filter(({ r }) => pY >= r.top && pY <= r.bottom)
 
         if (sameRow.length > 0) {
           const rightmost = sameRow.reduce((a, b) => a.r.right > b.r.right ? a : b)
           if (pX >= rightmost.r.right) {
-            // Puntero a la derecha del último item de la fila → target = ese último
-            // Al insertar ANTES de él, se desplazará a la derecha haciendo hueco visible
+            // Cursor a la derecha del último item de la fila → siempre insertar después
             foundKey = rightmost.k
+            foundInsertAfter = true
           } else {
-            // Entre items: el más cercano en X
-            foundKey = sameRow.reduce((best, cur) => {
+            // Entre items: el más cercano en X, luego mitad izquierda/derecha
+            const closest = sameRow.reduce((best, cur) => {
               const dB = Math.abs(pX - (best.r.left + best.r.right) / 2)
               const dC = Math.abs(pX - (cur.r.left + cur.r.right) / 2)
               return dC < dB ? cur : best
-            }).k
+            })
+            foundKey = closest.k
+            foundInsertAfter = pX > (closest.r.left + closest.r.right) / 2
           }
         } else {
           // Fuera de todas las filas (zona vacía / entre filas) → último item del grid.
-          // Al insertar ANTES de él, se desplaza un slot mostrando el hueco.
-          foundKey = itemRects.reduce((a, b) => {
+          const last = itemRects.reduce((a, b) => {
             const aY = (a.r.top + a.r.bottom) / 2, bY = (b.r.top + b.r.bottom) / 2
-            if (Math.abs(aY - bY) > 20) return aY > bY ? a : b // más abajo
-            return a.r.right > b.r.right ? a : b                // más a la derecha
-          }).k
+            if (Math.abs(aY - bY) > 20) return aY > bY ? a : b
+            return a.r.right > b.r.right ? a : b
+          })
+          foundKey = last.k
+          foundInsertAfter = true
         }
       }
     }
 
-    if (foundKey && foundKey !== state.dragOverKey) {
-      // Cancelar cualquier FLIP en curso antes de leer posiciones,
-      // así getBoundingClientRect devuelve la posición de layout final (no mid-animación).
+    const changed = foundKey && (foundKey !== state.dragOverKey || foundInsertAfter !== (state.insertAfter ?? false))
+
+    if (changed) {
+      // Cancelar cualquier FLIP en curso antes de leer posiciones
       allItems.forEach(el => {
         if (el.style.transition) {
           el.style.transition = 'none'
@@ -594,19 +602,22 @@ export default function MainPage() {
       })
       itemPositionsRef.current = positions
       state.dragOverKey = foundKey
+      state.insertAfter = foundInsertAfter
       setDragOverKey(foundKey)
+      setDragInsertAfter(foundInsertAfter)
     }
   }, [])
 
   const handleDragPointerUp = useCallback(() => {
     const state = dragStateRef.current
     if (!state) return
-    commitDrag(state.dragKey, state.dragOverKey)
+    commitDrag(state.dragKey, state.dragOverKey, state.insertAfter ?? false)
     document.querySelectorAll('[data-drag-key]').forEach(el => { el.style.transform = ''; el.style.transition = '' })
     dragStateRef.current = null
     itemPositionsRef.current = {}
     setDragKey(null)
     setDragOverKey(null)
+    setDragInsertAfter(false)
     setDragClone(null)
     setDragOverFolder(null)
   }, [currentFolderId, folderOrders, gridOrder]) // eslint-disable-line
@@ -658,7 +669,7 @@ export default function MainPage() {
       el.style.transition = 'transform 0.2s cubic-bezier(0.2,0,0,1)'
       el.style.transform = ''
     })
-  }, [dragKey, dragOverKey]) // eslint-disable-line
+  }, [dragKey, dragOverKey, dragInsertAfter]) // eslint-disable-line
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return

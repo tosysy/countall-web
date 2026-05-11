@@ -714,6 +714,11 @@ export default function MainPage() {
           ghostClass={styles.sortableGhost}
           chosenClass={styles.sortableChosen}
           disabled={selectionMode}
+          delay={150}
+          delayOnTouchOnly={true}
+          touchStartThreshold={4}
+          forceFallback={true}
+          fallbackTolerance={3}
           onStart={() => cancelLongPress()}
           onEnd={() => push()}
         >

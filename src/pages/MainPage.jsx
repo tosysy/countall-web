@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { ReactSortable } from 'react-sortablejs'
 import CounterCard from '../components/CounterCard'
 import FolderCard from '../components/FolderCard'
 import ExpandedCounter from '../components/ExpandedCounter'
@@ -429,6 +430,18 @@ export default function MainPage() {
 
   const getItemKey = (item) => `${item.type === 'counter' ? 'C' : 'F'}:${item.data.id}`
 
+  // ── SortableJS ────────────────────────────────────────────────────────────
+  const sortableItems = items.map(item => ({ ...item, id: getItemKey(item) }))
+
+  const handleSetList = (newList) => {
+    const newOrder = newList.map(i => i.id)
+    if (currentFolderId) {
+      setFolderOrder(currentFolderId, newOrder)
+    } else {
+      setGridOrder(newOrder)
+    }
+  }
+
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
     const folderId = counter.folderId
@@ -691,9 +704,21 @@ export default function MainPage() {
           <p>Pulsa + para crear tu primer contador</p>
         </div>
       ) : (
-        <div key={currentFolderId ?? 'root'} className="counter-grid">
-          {items.map((item, idx) => {
-            const key = getItemKey(item)
+        <ReactSortable
+          tag="div"
+          className="counter-grid"
+          key={currentFolderId ?? 'root'}
+          list={sortableItems}
+          setList={handleSetList}
+          animation={150}
+          ghostClass={styles.sortableGhost}
+          chosenClass={styles.sortableChosen}
+          disabled={selectionMode}
+          onStart={() => cancelLongPress()}
+          onEnd={() => push()}
+        >
+          {sortableItems.map((item, idx) => {
+            const key = item.id
             const isSelected = selectedKeys.has(key)
             return (
               <div key={key}
@@ -739,7 +764,7 @@ export default function MainPage() {
               </div>
             )
           })}
-        </div>
+        </ReactSortable>
       )}
 
       {/* ── FAB ────────────────────────────────────────────────────────── */}

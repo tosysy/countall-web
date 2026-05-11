@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import CounterCard from '../components/CounterCard'
 import FolderCard from '../components/FolderCard'
@@ -51,14 +51,6 @@ export default function MainPage() {
   const [createErrors, setCreateErrors] = useState({}) // { name, increment, target }
   const [invBadge, setInvBadge] = useState(false)
   const [friendBadge, setFriendBadge] = useState(false)
-  const [dragKey, setDragKey] = useState(null)
-  const [dragOverKey, setDragOverKey] = useState(null)
-  const [dragInsertAfter, setDragInsertAfter] = useState(false)
-  const [dragOverFolder, setDragOverFolder] = useState(null)
-  // dragClone: { item, x, y, width, height } — clone flotante que sigue el puntero
-  const [dragClone, setDragClone] = useState(null)
-  const dragStateRef = useRef(null)     // acceso sin stale closure en pointermove
-  const itemPositionsRef = useRef({})  // posiciones pre-reorder para FLIP animation
   const [expandedShowMenu, setExpandedShowMenu] = useState(false)
   const [expandedInitialTab, setExpandedInitialTab] = useState('log')
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
@@ -435,202 +427,7 @@ export default function MainPage() {
     finally { setJoinLoading(false) }
   }
 
-  // ── Drag & Drop ──────────────────────────────────────────────────────────
   const getItemKey = (item) => `${item.type === 'counter' ? 'C' : 'F'}:${item.data.id}`
-
-  const resetDrag = () => {
-    document.querySelectorAll('[data-drag-key]').forEach(el => { el.style.transform = ''; el.style.transition = '' })
-    setDragKey(null); setDragOverKey(null); setDragInsertAfter(false); setDragOverFolder(null); setDragClone(null)
-    dragStateRef.current = null; itemPositionsRef.current = {}
-  }
-
-  // ── Drag reorder helpers ──────────────────────────────────────────────────
-
-  // Reordena items en vivo mientras se arrastra
-  const getLiveItems = (baseItems) => {
-    const dk = dragStateRef.current?.dragKey
-    if (!dk) return baseItems
-    const fromIdx = baseItems.findIndex(i => getItemKey(i) === dk)
-    if (fromIdx === -1) return baseItems
-
-    // Siempre quitar el item arrastrado de su posición original
-    const next = [...baseItems]
-    const [dragged] = next.splice(fromIdx, 1)
-
-    // Si hay un target distinto, insertar placeholder en la posición correcta
-    const dok = dragStateRef.current?.dragOverKey
-    const insertAfter = dragStateRef.current?.insertAfter ?? false
-    if (dok && dok !== dk) {
-      const overItem = next.find(i => getItemKey(i) === dok)
-      if (!(overItem?.type === 'folder' && dk.startsWith('C:'))) {
-        const toIdx = next.findIndex(i => getItemKey(i) === dok)
-        if (toIdx !== -1) next.splice(insertAfter ? toIdx + 1 : toIdx, 0, dragged)
-      }
-    }
-    // Si dk===dok (justo al empezar), el item NO aparece en ningún lado → los demás se cierran
-    return next
-  }
-
-  const commitDrag = (finalDragKey, finalOverKey, finalInsertAfter) => {
-    if (!finalDragKey || !finalOverKey || finalDragKey === finalOverKey) return
-    const currentOrder = currentFolderId
-      ? [...(folderOrders[currentFolderId] ?? [])]
-      : [...gridOrder]
-    const fromIdx = currentOrder.indexOf(finalDragKey)
-    const toIdx   = currentOrder.indexOf(finalOverKey)
-    if (fromIdx === -1 || toIdx === -1) return
-    const newOrder = [...currentOrder]
-    newOrder.splice(fromIdx, 1)
-    // Ajustar toIdx tras la eliminación del origen
-    const adjustedToIdx = toIdx > fromIdx ? toIdx - 1 : toIdx
-    // insertAfter: insertar una posición después del target
-    newOrder.splice(finalInsertAfter ? adjustedToIdx + 1 : adjustedToIdx, 0, finalDragKey)
-    if (currentFolderId) setFolderOrder(currentFolderId, newOrder)
-    else setGridOrder(newOrder)
-    push()
-  }
-
-  // ── Pointer-based drag (funciona en móvil y escritorio) ───────────────────
-
-  const handleHandlePointerDown = (e, item) => {
-    if (!selectionMode) return
-    e.preventDefault()
-    e.stopPropagation()
-    const key = getItemKey(item)
-    const gridEl = document.querySelector(`[data-drag-key="${key}"]`)
-    if (!gridEl) return
-    const rect = gridEl.getBoundingClientRect()
-
-    // NO capturamos posiciones aquí: el reencuadre inicial (al quitar el item)
-    // es instantáneo (sin FLIP) para que getBoundingClientRect nunca devuelva
-    // posiciones a mitad de animación durante el drag.
-    itemPositionsRef.current = {}
-
-    dragStateRef.current = { dragKey: key, dragOverKey: key, insertAfter: false, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top }
-    setDragKey(key)
-    setDragOverKey(key)
-    setDragClone({ item, x: rect.left, y: rect.top, width: rect.width, height: rect.height })
-    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
-  }
-
-  const handleDragPointerMove = useCallback((e) => {
-    const state = dragStateRef.current
-    if (!state) return
-
-    // Actualizar posición del clone flotante
-    setDragClone(prev => prev ? { ...prev, x: e.clientX - state.offsetX, y: e.clientY - state.offsetY } : null)
-
-    const allItems = document.querySelectorAll('[data-drag-key]')
-
-    // ── Closest center (algoritmo de dnd-kit) ─────────────────────────────
-    // Encuentra el item cuyo centro está más cerca del cursor.
-    // No usa mitad izq/der: la dirección (before/after) se deduce del orden original.
-    let foundKey = null
-    let minDist = Infinity
-    for (const el of allItems) {
-      const k = el.getAttribute('data-drag-key')
-      if (k === state.dragKey) continue
-      const r = el.getBoundingClientRect()
-      const dist = Math.hypot(e.clientX - (r.left + r.right) / 2, e.clientY - (r.top + r.bottom) / 2)
-      if (dist < minDist) { minDist = dist; foundKey = k }
-    }
-
-    if (foundKey && foundKey !== state.dragOverKey) {
-      // ── Determinar insertAfter desde el orden ORIGINAL ─────────────────
-      // Si el item arrastrado venía de ANTES del target → insertar DESPUÉS
-      // Si venía de DESPUÉS                            → insertar ANTES
-      // Esto replica exactamente el comportamiento del tutorial/dnd-kit:
-      //   draggedIdx < targetIdx  →  insertBefore(dragged, target.nextSibling)
-      //   draggedIdx > targetIdx  →  insertBefore(dragged, target)
-      const { gridOrder, folderOrders, currentFolderId } = useAppStore.getState()
-      const origOrder = currentFolderId ? (folderOrders[currentFolderId] ?? []) : gridOrder
-      const dragOrigIdx   = origOrder.indexOf(state.dragKey)
-      const targetOrigIdx = origOrder.indexOf(foundKey)
-      const foundInsertAfter = dragOrigIdx < targetOrigIdx
-
-      // Cancelar cualquier FLIP en curso antes de leer posiciones
-      allItems.forEach(el => {
-        if (el.style.transition) { el.style.transition = 'none'; el.style.transform = '' }
-      })
-
-      // Capturar posiciones estables ANTES del re-render (paso "First" del FLIP)
-      const positions = {}
-      allItems.forEach(el => {
-        const k = el.getAttribute('data-drag-key')
-        if (k === state.dragKey) return
-        const r = el.getBoundingClientRect()
-        positions[k] = { x: r.left, y: r.top }
-      })
-      itemPositionsRef.current = positions
-      state.dragOverKey = foundKey
-      state.insertAfter = foundInsertAfter
-      setDragOverKey(foundKey)
-      setDragInsertAfter(foundInsertAfter)
-    }
-  }, [])
-
-  const handleDragPointerUp = useCallback(() => {
-    const state = dragStateRef.current
-    if (!state) return
-    commitDrag(state.dragKey, state.dragOverKey, state.insertAfter ?? false)
-    document.querySelectorAll('[data-drag-key]').forEach(el => { el.style.transform = ''; el.style.transition = '' })
-    dragStateRef.current = null
-    itemPositionsRef.current = {}
-    setDragKey(null)
-    setDragOverKey(null)
-    setDragInsertAfter(false)
-    setDragClone(null)
-    setDragOverFolder(null)
-  }, [currentFolderId, folderOrders, gridOrder]) // eslint-disable-line
-
-  useEffect(() => {
-    if (!dragClone) return
-    document.addEventListener('pointermove', handleDragPointerMove)
-    document.addEventListener('pointerup',   handleDragPointerUp)
-    document.addEventListener('pointercancel', handleDragPointerUp)
-    return () => {
-      document.removeEventListener('pointermove', handleDragPointerMove)
-      document.removeEventListener('pointerup',   handleDragPointerUp)
-      document.removeEventListener('pointercancel', handleDragPointerUp)
-    }
-  }, [dragClone, handleDragPointerMove, handleDragPointerUp])
-
-  // ── FLIP animation: anima items desde posición anterior a la nueva ────────
-  useLayoutEffect(() => {
-    if (!dragKey || !dragOverKey) return
-    const prevPositions = itemPositionsRef.current
-    if (Object.keys(prevPositions).length === 0) return
-
-    const allItems = document.querySelectorAll('[data-drag-key]')
-    const toAnimate = []
-
-    allItems.forEach(el => {
-      const k = el.getAttribute('data-drag-key')
-      if (k === dragKey) return // el item arrastrado es invisible, no animar
-      const prev = prevPositions[k]
-      if (!prev) return
-      const rect = el.getBoundingClientRect()
-      const dx = prev.x - rect.left
-      const dy = prev.y - rect.top
-      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) toAnimate.push({ el, dx, dy })
-    })
-
-    itemPositionsRef.current = {}
-    if (toAnimate.length === 0) return
-
-    // Invert: colocar en posición anterior sin transición
-    toAnimate.forEach(({ el, dx, dy }) => {
-      el.style.transition = 'none'
-      el.style.transform = `translate(${dx}px, ${dy}px)`
-    })
-    // Force reflow para que el browser registre el transform inicial
-    toAnimate[0].el.getBoundingClientRect()
-    // Play: animar hacia posición natural (sin transform)
-    toAnimate.forEach(({ el }) => {
-      el.style.transition = 'transform 0.2s cubic-bezier(0.2,0,0,1)'
-      el.style.transform = ''
-    })
-  }, [dragKey, dragOverKey, dragInsertAfter]) // eslint-disable-line
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
@@ -895,27 +692,16 @@ export default function MainPage() {
         </div>
       ) : (
         <div key={currentFolderId ?? 'root'} className="counter-grid">
-          {getLiveItems(items).map((item, idx) => {
+          {items.map((item, idx) => {
             const key = getItemKey(item)
-            const isFolder = item.type === 'folder'
-            const isFolderDropTarget = isFolder && dragOverFolder === item.data.id
             const isSelected = selectedKeys.has(key)
-            const isDragging = dragKey === key
             return (
               <div key={key}
-                data-drag-key={key}
                 className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
-                style={{
-                  opacity: isDragging ? 0 : 1,
-                  // animation: none evita que cardEnter sobreescriba opacity:0 al reinsertar el placeholder
-                  animation: isDragging ? 'none' : undefined,
-                  pointerEvents: isDragging ? 'none' : undefined,
-                  position: 'relative',
-                  animationDelay: dragKey ? '0ms' : `${idx * 35}ms`,
-                }}
+                style={{ position: 'relative', animationDelay: `${idx * 35}ms` }}
               >
                 {item.type === 'counter' ? (
                   <CounterCard
@@ -937,27 +723,18 @@ export default function MainPage() {
                     folderOrder={folderOrders[item.data.id] ?? []}
                     onClick={(f) => selectionMode ? toggleSelect(key) : setCurrentFolder(f.id)}
                     onMenu={!selectionMode ? handleFolderMenu : undefined}
-                    isDragTarget={isFolderDropTarget}
                   />
                 )}
-                {/* Overlay modo selección: drag handle izquierda, checkbox derecha */}
+                {/* Overlay modo selección: checkbox */}
                 {selectionMode && (
-                  <>
-                    <div className={styles.dragHandle}
-                      onPointerDown={(e) => handleHandlePointerDown(e, item)}>
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                  <div className={`${styles.checkbox} ${isSelected ? styles.checkboxOn : ''}`}
+                    onPointerDown={e => { e.stopPropagation(); toggleSelect(key) }}>
+                    {isSelected && (
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
                       </svg>
-                    </div>
-                    <div className={`${styles.checkbox} ${isSelected ? styles.checkboxOn : ''}`}
-                      onPointerDown={e => { e.stopPropagation(); toggleSelect(key) }}>
-                      {isSelected && (
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                        </svg>
-                      )}
-                    </div>
-                  </>
+                    )}
+                  </div>
                 )}
               </div>
             )
@@ -1435,45 +1212,6 @@ export default function MainPage() {
           </div>
         )
       })()}
-
-      {/* ── Clone flotante para drag ─────────────────────────────────────── */}
-      {dragClone && (
-        <div
-          id="drag-clone-portal"
-          style={{
-            position: 'fixed',
-            left: dragClone.x,
-            top: dragClone.y,
-            width: dragClone.width,
-            height: dragClone.height,
-            zIndex: 1000,
-            pointerEvents: 'none',
-            transform: 'scale(1.05)',
-            transformOrigin: 'center center',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.38)',
-            borderRadius: 16,
-            opacity: 0.96,
-            willChange: 'left, top',
-          }}
-        >
-          {dragClone.item.type === 'counter' ? (
-            <CounterCard
-              counter={dragClone.item.data}
-              onIncrement={undefined}
-              onDecrement={undefined}
-              onClick={undefined}
-            />
-          ) : (
-            <FolderCard
-              folder={dragClone.item.data}
-              folderCounters={getFolderCounters(dragClone.item.data.id)}
-              subFolders={folders.filter(f => f.parentFolderId === dragClone.item.data.id)}
-              folderOrder={folderOrders[dragClone.item.data.id] ?? []}
-              onClick={undefined}
-            />
-          )}
-        </div>
-      )}
 
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}

@@ -67,8 +67,6 @@ img { display: block; max-width: 100%; }
   transition: background 0.2s, color 0.2s;
   display: flex;
   flex-direction: column;
-  max-width: 900px;
-  margin: 0 auto;
   position: relative;
 }
 
@@ -281,10 +279,13 @@ img { display: block; max-width: 100%; }
   padding: 8px 12px 120px;
 }
 @media (min-width: 600px) {
-  .counter-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .counter-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); padding: 8px 16px 120px; }
 }
 @media (min-width: 900px) {
-  .counter-grid { grid-template-columns: repeat(4, 1fr); }
+  .counter-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); padding: 12px 24px 120px; }
+}
+@media (min-width: 1400px) {
+  .counter-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); padding: 16px 32px 120px; }
 }
 
 /* ── Safe area ────────────────────────────────────────────────────────────────── */

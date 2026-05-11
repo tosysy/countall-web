@@ -1,5 +1,10 @@
 .page { display:flex; flex-direction:column; height:100%; background:var(--bg); overflow:hidden; }
 
+.inner {
+  display:flex; flex-direction:column; flex:1; overflow:hidden;
+  width:100%; max-width:680px; margin:0 auto;
+}
+
 .header {
   display:flex; align-items:center; gap:8px;
   padding:12px 12px 8px;

@@ -126,6 +126,7 @@ export default function InvitationsPage() {
 
   return (
     <div className={styles.page}>
+    <div className={styles.inner}>
       <header className={styles.header}>
         <button className="btn-icon" onClick={() => navigate(-1)}>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -338,6 +339,7 @@ export default function InvitationsPage() {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+    </div>
     </div>
   )
 }

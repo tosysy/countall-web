@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ReactSortable } from 'react-sortablejs'
-import Sortable, { MultiDrag } from 'sortablejs'
-Sortable.mount(new MultiDrag())
 import CounterCard from '../components/CounterCard'
 import FolderCard from '../components/FolderCard'
 import ExpandedCounter from '../components/ExpandedCounter'
@@ -444,24 +442,28 @@ export default function MainPage() {
     }
   }
 
-  // Sync React selection state → SortableJS MultiDrag internal state
-  const syncSortableSelection = useCallback(() => {
-    const container = document.getElementById('main-sort-grid')
-    if (!container) return
-    const sortable = Sortable.get(container)
-    if (!sortable) return
-    Array.from(container.children).forEach(child => {
-      const key = child.getAttribute('data-sortable-key')
-      if (!key) return
-      if (selectedKeys.has(key)) {
-        sortable.select(child)
-      } else {
-        sortable.deselect(child)
-      }
-    })
-  }, [selectedKeys])
+  // Cuando termina un drag: si el ítem arrastrado estaba seleccionado,
+  // mover todos los ítems seleccionados adyacentes al ítem arrastrado
+  const handleDragEnd = useCallback((evt) => {
+    const draggedKey = evt.item?.getAttribute('data-id')
 
-  useEffect(() => { syncSortableSelection() }, [syncSortableSelection])
+    if (draggedKey && selectedKeys.has(draggedKey) && selectedKeys.size > 1) {
+      const store = useAppStore.getState()
+      const order = currentFolderId
+        ? (store.folderOrders[currentFolderId] ?? [])
+        : store.gridOrder
+
+      const others = order.filter(k => k !== draggedKey && selectedKeys.has(k))
+      const base = order.filter(k => !selectedKeys.has(k) || k === draggedKey)
+      const insertAt = base.indexOf(draggedKey) + 1
+      const finalOrder = [...base.slice(0, insertAt), ...others, ...base.slice(insertAt)]
+
+      if (currentFolderId) setFolderOrder(currentFolderId, finalOrder)
+      else setGridOrder(finalOrder)
+    }
+
+    push()  // Zustand es síncrono → push lee el orden ya actualizado
+  }, [selectedKeys, currentFolderId])
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
@@ -727,7 +729,6 @@ export default function MainPage() {
       ) : (
         <ReactSortable
           tag="div"
-          id="main-sort-grid"
           className="counter-grid"
           key={currentFolderId ?? 'root'}
           list={sortableItems}
@@ -735,24 +736,19 @@ export default function MainPage() {
           animation={150}
           ghostClass={styles.sortableGhost}
           chosenClass={styles.sortableChosen}
-          multiDrag={true}
-          selectedClass={styles.gridItemSelected}
-          multiDragKey="ctrl"
-          avoidImplicitDeselect={true}
           delay={150}
           delayOnTouchOnly={true}
           touchStartThreshold={4}
           forceFallback={true}
           fallbackTolerance={3}
           onStart={() => cancelLongPress()}
-          onEnd={() => { push(); syncSortableSelection() }}
+          onEnd={handleDragEnd}
         >
           {sortableItems.map((item, idx) => {
             const key = item.id
             const isSelected = selectedKeys.has(key)
             return (
               <div key={key}
-                data-sortable-key={key}
                 className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}

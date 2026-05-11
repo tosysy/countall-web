@@ -433,37 +433,60 @@ export default function MainPage() {
   // ── SortableJS ────────────────────────────────────────────────────────────
   const sortableItems = items.map(item => ({ ...item, id: getItemKey(item) }))
 
+  // Ref para saber qué ítem se está arrastrando (sin causar re-render)
+  const draggingKeyRef = useRef(null)
+  const [isDraggingMulti, setIsDraggingMulti] = useState(false)
+
+  // Aplica el multi-move: todos los seleccionados quedan junto al ítem arrastrado
+  const applyMultiMove = (order, draggedKey) => {
+    if (!draggedKey || !selectedKeys.has(draggedKey) || selectedKeys.size <= 1) return order
+    const others = order.filter(k => k !== draggedKey && selectedKeys.has(k))
+    const base   = order.filter(k => !selectedKeys.has(k) || k === draggedKey)
+    const at = base.indexOf(draggedKey) + 1
+    return [...base.slice(0, at), ...others, ...base.slice(at)]
+  }
+
   const handleSetList = (newList) => {
-    const newOrder = newList.map(i => i.id)
-    if (currentFolderId) {
-      setFolderOrder(currentFolderId, newOrder)
-    } else {
-      setGridOrder(newOrder)
+    const newOrder = applyMultiMove(newList.map(i => i.id), draggingKeyRef.current)
+    if (currentFolderId) setFolderOrder(currentFolderId, newOrder)
+    else setGridOrder(newOrder)
+  }
+
+  const handleDragStart = (evt) => {
+    cancelLongPress()
+    const dk = evt.item?.getAttribute('data-id') ?? null
+    draggingKeyRef.current = dk
+    const isMulti = dk && selectedKeys.has(dk) && selectedKeys.size > 1
+    setIsDraggingMulti(!!isMulti)
+    if (isMulti) {
+      // Inyectar badge de conteo en el ghost de SortableJS
+      setTimeout(() => {
+        const ghost = document.querySelector('.sortable-fallback')
+        if (ghost && !ghost.querySelector('[data-drag-badge]')) {
+          ghost.style.overflow = 'visible'
+          const badge = document.createElement('span')
+          badge.setAttribute('data-drag-badge', '1')
+          badge.style.cssText = [
+            'position:absolute', 'top:-10px', 'right:-10px',
+            'background:#1E88E5', 'color:#fff', 'border-radius:50%',
+            'width:24px', 'height:24px', 'display:flex',
+            'align-items:center', 'justify-content:center',
+            'font-size:12px', 'font-weight:700',
+            'box-shadow:0 2px 8px rgba(0,0,0,.4)',
+            'pointer-events:none', 'z-index:9999',
+          ].join(';')
+          badge.textContent = selectedKeys.size
+          ghost.appendChild(badge)
+        }
+      }, 0)
     }
   }
 
-  // Cuando termina un drag: si el ítem arrastrado estaba seleccionado,
-  // mover todos los ítems seleccionados adyacentes al ítem arrastrado
-  const handleDragEnd = useCallback((evt) => {
-    const draggedKey = evt.item?.getAttribute('data-id')
-
-    if (draggedKey && selectedKeys.has(draggedKey) && selectedKeys.size > 1) {
-      const store = useAppStore.getState()
-      const order = currentFolderId
-        ? (store.folderOrders[currentFolderId] ?? [])
-        : store.gridOrder
-
-      const others = order.filter(k => k !== draggedKey && selectedKeys.has(k))
-      const base = order.filter(k => !selectedKeys.has(k) || k === draggedKey)
-      const insertAt = base.indexOf(draggedKey) + 1
-      const finalOrder = [...base.slice(0, insertAt), ...others, ...base.slice(insertAt)]
-
-      if (currentFolderId) setFolderOrder(currentFolderId, finalOrder)
-      else setGridOrder(finalOrder)
-    }
-
-    push()  // Zustand es síncrono → push lee el orden ya actualizado
-  }, [selectedKeys, currentFolderId])
+  const handleDragEnd = () => {
+    draggingKeyRef.current = null
+    setIsDraggingMulti(false)
+    push()
+  }
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
@@ -741,7 +764,7 @@ export default function MainPage() {
           touchStartThreshold={4}
           forceFallback={true}
           fallbackTolerance={3}
-          onStart={() => cancelLongPress()}
+          onStart={handleDragStart}
           onEnd={handleDragEnd}
         >
           {sortableItems.map((item, idx) => {
@@ -749,7 +772,7 @@ export default function MainPage() {
             const isSelected = selectedKeys.has(key)
             return (
               <div key={key}
-                className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
+                className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''} ${isDraggingMulti && isSelected && key !== draggingKeyRef.current ? styles.gridItemFollowing : ''}`}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}

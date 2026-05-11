@@ -521,75 +521,36 @@ export default function MainPage() {
     setDragClone(prev => prev ? { ...prev, x: e.clientX - state.offsetX, y: e.clientY - state.offsetY } : null)
 
     const allItems = document.querySelectorAll('[data-drag-key]')
-    let foundKey = null
-    let foundInsertAfter = false
 
-    // 1) Overlap directo con algún item
+    // ── Closest center (algoritmo de dnd-kit) ─────────────────────────────
+    // Encuentra el item cuyo centro está más cerca del cursor.
+    // No usa mitad izq/der: la dirección (before/after) se deduce del orden original.
+    let foundKey = null
+    let minDist = Infinity
     for (const el of allItems) {
       const k = el.getAttribute('data-drag-key')
       if (k === state.dragKey) continue
       const r = el.getBoundingClientRect()
-      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-        foundKey = k
-        // Mitad derecha del item → insertar después; mitad izquierda → antes
-        foundInsertAfter = e.clientX > (r.left + r.right) / 2
-        break
-      }
+      const dist = Math.hypot(e.clientX - (r.left + r.right) / 2, e.clientY - (r.top + r.bottom) / 2)
+      if (dist < minDist) { minDist = dist; foundKey = k }
     }
 
-    // 2) Sin overlap directo → lógica por fila
-    if (!foundKey) {
-      const pX = e.clientX, pY = e.clientY
-      const itemRects = []
-      for (const el of allItems) {
-        const k = el.getAttribute('data-drag-key')
-        if (k === state.dragKey) continue
-        const r = el.getBoundingClientRect()
-        itemRects.push({ k, r })
-      }
+    if (foundKey && foundKey !== state.dragOverKey) {
+      // ── Determinar insertAfter desde el orden ORIGINAL ─────────────────
+      // Si el item arrastrado venía de ANTES del target → insertar DESPUÉS
+      // Si venía de DESPUÉS                            → insertar ANTES
+      // Esto replica exactamente el comportamiento del tutorial/dnd-kit:
+      //   draggedIdx < targetIdx  →  insertBefore(dragged, target.nextSibling)
+      //   draggedIdx > targetIdx  →  insertBefore(dragged, target)
+      const { gridOrder, folderOrders, currentFolderId } = useAppStore.getState()
+      const origOrder = currentFolderId ? (folderOrders[currentFolderId] ?? []) : gridOrder
+      const dragOrigIdx   = origOrder.indexOf(state.dragKey)
+      const targetOrigIdx = origOrder.indexOf(foundKey)
+      const foundInsertAfter = dragOrigIdx < targetOrigIdx
 
-      if (itemRects.length > 0) {
-        // Detección de fila ESTRICTA: solo items cuyo rango vertical contiene exactamente pY.
-        const sameRow = itemRects.filter(({ r }) => pY >= r.top && pY <= r.bottom)
-
-        if (sameRow.length > 0) {
-          const rightmost = sameRow.reduce((a, b) => a.r.right > b.r.right ? a : b)
-          if (pX >= rightmost.r.right) {
-            // Cursor a la derecha del último item de la fila → siempre insertar después
-            foundKey = rightmost.k
-            foundInsertAfter = true
-          } else {
-            // Entre items: el más cercano en X, luego mitad izquierda/derecha
-            const closest = sameRow.reduce((best, cur) => {
-              const dB = Math.abs(pX - (best.r.left + best.r.right) / 2)
-              const dC = Math.abs(pX - (cur.r.left + cur.r.right) / 2)
-              return dC < dB ? cur : best
-            })
-            foundKey = closest.k
-            foundInsertAfter = pX > (closest.r.left + closest.r.right) / 2
-          }
-        } else {
-          // Fuera de todas las filas (zona vacía / entre filas) → último item del grid.
-          const last = itemRects.reduce((a, b) => {
-            const aY = (a.r.top + a.r.bottom) / 2, bY = (b.r.top + b.r.bottom) / 2
-            if (Math.abs(aY - bY) > 20) return aY > bY ? a : b
-            return a.r.right > b.r.right ? a : b
-          })
-          foundKey = last.k
-          foundInsertAfter = true
-        }
-      }
-    }
-
-    const changed = foundKey && (foundKey !== state.dragOverKey || foundInsertAfter !== (state.insertAfter ?? false))
-
-    if (changed) {
       // Cancelar cualquier FLIP en curso antes de leer posiciones
       allItems.forEach(el => {
-        if (el.style.transition) {
-          el.style.transition = 'none'
-          el.style.transform   = ''
-        }
+        if (el.style.transition) { el.style.transition = 'none'; el.style.transform = '' }
       })
 
       // Capturar posiciones estables ANTES del re-render (paso "First" del FLIP)

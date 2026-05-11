@@ -50,11 +50,10 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     setSigningOut(true)
+    // Firebase sign-out dispara onAuthStateChanged(null) en App.jsx,
+    // que se encarga de limpiar datos y navegar al login.
     await firebaseSignOut()
-    clearData()
-    // Pequeño delay para que la animación de salida se vea antes de navegar
-    await new Promise(r => setTimeout(r, 350))
-    navigate('/login', { replace: true })
+    // clearData y navigate los gestiona App.jsx → nada más que hacer aquí.
   }
 
   const handleDeleteAccount = async () => {

@@ -43,6 +43,52 @@ function OfflineBanner() {
   )
 }
 
+/** Modal de carga — bloquea toda la UI con barra de progreso */
+function LoadingModal({ message, progress, variant = 'load' }) {
+  const isSignOut = variant === 'signout'
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 99997,
+      background: 'var(--bg)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 28, padding: 40, textAlign: 'center',
+      animation: 'fadeIn 0.2s ease',
+    }}>
+      {isSignOut ? (
+        <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+        </svg>
+      ) : (
+        <img
+          src="https://raw.githubusercontent.com/tosysy/CountAll/main/icon-192.png"
+          alt="CountAll" width="72" height="72"
+          style={{ borderRadius: 18, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}
+        />
+      )}
+      <div>
+        {!isSignOut && (
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px', letterSpacing: -0.5 }}>
+            CountAll
+          </h2>
+        )}
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>{message}</p>
+      </div>
+      <div style={{ width: '100%', maxWidth: 260 }}>
+        <div style={{ height: 5, background: 'var(--card-stroke)', borderRadius: 99, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%',
+            width: `${progress}%`,
+            background: 'var(--btn-plus)',
+            borderRadius: 99,
+            transition: 'width 0.45s cubic-bezier(0.4,0,0.2,1)',
+          }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Pantalla de mantenimiento — bloquea toda la UI igual que en Android */
 function MaintenanceScreen({ message }) {
   return (
@@ -212,7 +258,9 @@ export default function App() {
   const navigate = useNavigate()
   const { setUser, setUsername, setDriveToken, updateCounter, clearData } = useAppStore()
   const pendingCodeRef = useRef(null)
-  const tokenRefreshedRef = useRef(false) // evitar bucle si signInWithPopup dispara onAuthStateChanged
+  const tokenRefreshedRef = useRef(false)   // evitar bucle si signInWithPopup dispara onAuthStateChanged
+  const syncInProgressRef = useRef(false)   // evitar doble llamada a initPersonalSync
+  const [loadingScreen, setLoadingScreen] = useState(null) // null | { message, progress, variant }
   const [rcConfig, setRcConfig] = useState({ maintenanceMode: false, maintenanceMessage: '', appBanner: '', appBannerColor: '#1E88E5' })
 
   // ── App config / mantenimiento — listener RTDB, arranca siempre ─────────
@@ -246,10 +294,28 @@ export default function App() {
 
     const handleUser = async (user) => {
       if (!user) {
-        // Resetear el flag para que el próximo inicio de sesión (en la misma sesión
-        // de navegador, sin recargar) ejecute initPersonalSync y descargue los datos.
+        // Resetear flags para que el próximo login funcione correctamente
         tokenRefreshedRef.current = false
+        syncInProgressRef.current = false
+
+        // Mostrar pantalla de cierre de sesión
+        setLoadingScreen({ message: 'Cerrando sesión…', progress: 30, variant: 'signout' })
+
+        // Limpiar todo el estado en memoria
         clearData()
+
+        // Eliminar datos persistidos: Zustand localStorage, sessionStorage y cualquier caché
+        try { localStorage.removeItem('countall-storage') } catch {}
+        try { sessionStorage.clear() } catch {}
+        // Revocar el token de Drive si está disponible
+        const { driveToken } = useAppStore.getState()
+        if (driveToken) {
+          fetch(`https://oauth2.googleapis.com/revoke?token=${driveToken}`, { method: 'POST' }).catch(() => {})
+        }
+
+        setLoadingScreen({ message: 'Cerrando sesión…', progress: 100, variant: 'signout' })
+        await new Promise(r => setTimeout(r, 350))
+        setLoadingScreen(null)
         navigate('/login', { replace: true })
         return
       }
@@ -305,15 +371,23 @@ export default function App() {
 
   const initPersonalSync = async (token) => {
     if (!token) return
+    // Evitar doble ejecución (onDriveToken de LoginPage + handleUser pueden coincidir)
+    if (syncInProgressRef.current) return
+    syncInProgressRef.current = true
 
-    // Intento inicial: pull de Drive para sincronizar estado (independientemente del deviceId,
-    // ya que esto es el primer carga — podría ser un dispositivo/navegador nuevo).
-    // Si no hay bundle en Drive, restaurar desde RTDB como fallback.
+    // ── Paso 1: conectar con Drive ───────────────────────────────────────────
+    setLoadingScreen({ message: 'Conectando con Drive…', progress: 10 })
+
+    // ── Paso 2: descargar datos personales ───────────────────────────────────
+    setLoadingScreen({ message: 'Descargando tus contadores…', progress: 30 })
     const initialData = await pullPersonalData(token).catch(() => null)
+
+    // ── Paso 3: aplicar datos ────────────────────────────────────────────────
+    setLoadingScreen({ message: 'Cargando contadores…', progress: 60 })
     if (initialData) {
       applyPersonalData(initialData)
     } else {
-      // Sin bundle en Drive: restaurar contadores/carpetas compartidos desde RTDB
+      // Sin bundle en Drive: restaurar compartidos desde RTDB como fallback
       const store = useAppStore.getState()
       const existingSharedIds = new Set(store.counters.filter(c => c.isShared && c.sharedId).map(c => c.sharedId))
       const existingFolderSharedIds = new Set(store.folders.filter(f => f.isShared && f.sharedId).map(f => f.sharedId))
@@ -327,17 +401,23 @@ export default function App() {
       }
     }
 
-    // Descarga inicial de imágenes de fondo (blob URLs no sobreviven recargas)
-    downloadAllBackgrounds(token).then(bgs => {
+    // ── Paso 4: descargar imágenes de fondo ──────────────────────────────────
+    setLoadingScreen({ message: 'Descargando imágenes…', progress: 80 })
+    try {
+      const bgs = await downloadAllBackgrounds(token)
       const store = useAppStore.getState()
       store.counters.forEach(c => {
-        if (!c.isShared && bgs[c.id]) {
-          updateCounter(c.id, { backgroundImageLocal: bgs[c.id] })
-        }
+        if (!c.isShared && bgs[c.id]) updateCounter(c.id, { backgroundImageLocal: bgs[c.id] })
       })
-    }).catch(() => {})
+    } catch {}
 
-    // Escuchar dataVersion → pull de Drive cuando cambie desde otro dispositivo
+    // ── Paso 5: listo ────────────────────────────────────────────────────────
+    setLoadingScreen({ message: '¡Todo listo!', progress: 100 })
+    await new Promise(r => setTimeout(r, 450))
+    setLoadingScreen(null)
+    syncInProgressRef.current = false
+
+    // ── Listeners en tiempo real (después de mostrar la UI) ──────────────────
     const unsub1 = listenDataVersion(async () => {
       const data = await pullPersonalData(token).catch(() => null)
       if (!data) return
@@ -345,14 +425,11 @@ export default function App() {
       applyPersonalData(data)
     })
 
-    // Escuchar bgVersion → pull de backgrounds
     const unsub2 = listenBgVersion(async () => {
       const bgs = await downloadAllBackgrounds(token).catch(() => ({}))
       const store = useAppStore.getState()
       store.counters.forEach(c => {
-        if (!c.isShared && bgs[c.id]) {
-          updateCounter(c.id, { backgroundImageLocal: bgs[c.id] })
-        }
+        if (!c.isShared && bgs[c.id]) updateCounter(c.id, { backgroundImageLocal: bgs[c.id] })
       })
     })
 
@@ -363,6 +440,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <div className="app">
+        {loadingScreen && <LoadingModal {...loadingScreen} />}
         {rcConfig.maintenanceMode && <MaintenanceScreen message={rcConfig.maintenanceMessage} />}
         {!rcConfig.maintenanceMode && rcConfig.appBanner && <AppBanner text={rcConfig.appBanner} color={rcConfig.appBannerColor} />}
         <OfflineBanner />

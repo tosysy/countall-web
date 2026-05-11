@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ReactSortable } from 'react-sortablejs'
+import Sortable, { MultiDrag } from 'sortablejs'
+Sortable.mount(new MultiDrag())
 import CounterCard from '../components/CounterCard'
 import FolderCard from '../components/FolderCard'
 import ExpandedCounter from '../components/ExpandedCounter'
@@ -442,6 +444,25 @@ export default function MainPage() {
     }
   }
 
+  // Sync React selection state → SortableJS MultiDrag internal state
+  const syncSortableSelection = useCallback(() => {
+    const container = document.getElementById('main-sort-grid')
+    if (!container) return
+    const sortable = Sortable.get(container)
+    if (!sortable) return
+    Array.from(container.children).forEach(child => {
+      const key = child.getAttribute('data-sortable-key')
+      if (!key) return
+      if (selectedKeys.has(key)) {
+        sortable.select(child)
+      } else {
+        sortable.deselect(child)
+      }
+    })
+  }, [selectedKeys])
+
+  useEffect(() => { syncSortableSelection() }, [syncSortableSelection])
+
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
     const folderId = counter.folderId
@@ -706,6 +727,7 @@ export default function MainPage() {
       ) : (
         <ReactSortable
           tag="div"
+          id="main-sort-grid"
           className="counter-grid"
           key={currentFolderId ?? 'root'}
           list={sortableItems}
@@ -713,20 +735,24 @@ export default function MainPage() {
           animation={150}
           ghostClass={styles.sortableGhost}
           chosenClass={styles.sortableChosen}
-          disabled={selectionMode}
+          multiDrag={true}
+          selectedClass={styles.gridItemSelected}
+          multiDragKey="ctrl"
+          avoidImplicitDeselect={true}
           delay={150}
           delayOnTouchOnly={true}
           touchStartThreshold={4}
           forceFallback={true}
           fallbackTolerance={3}
           onStart={() => cancelLongPress()}
-          onEnd={() => push()}
+          onEnd={() => { push(); syncSortableSelection() }}
         >
           {sortableItems.map((item, idx) => {
             const key = item.id
             const isSelected = selectedKeys.has(key)
             return (
               <div key={key}
+                data-sortable-key={key}
                 className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}

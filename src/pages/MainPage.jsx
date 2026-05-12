@@ -16,6 +16,7 @@ import {
   getInviteCode, getMembers,
 } from '../firebase/syncManager'
 import { uploadBackground as storageUpload, folderPath } from '../firebase/storageManager'
+import { requestAndRegisterFcm, onForegroundMessage } from '../firebase/messagingManager'
 import styles from './MainPage.module.css'
 
 const AVATAR_COLORS = ['#5C6BC0','#26A69A','#66BB6A','#EC407A','#FFA726','#42A5F5','#8D6E63','#78909C']
@@ -172,6 +173,33 @@ export default function MainPage() {
     const u2 = listenFriendRequests(list => setFriendBadge(list.length > 0))
     return () => { u1(); u2() }
   }, [user?.uid])
+
+  // ── FCM push notifications ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.uid) return
+    // Solicitar permiso y registrar token (solo si aún no se ha decidido)
+    if (Notification.permission === 'default') {
+      requestAndRegisterFcm().catch(() => {})
+    } else if (Notification.permission === 'granted') {
+      // Ya tiene permiso → refrescar el token por si cambió
+      requestAndRegisterFcm().catch(() => {})
+    }
+    // Mensajes en primer plano: reutilizar el sistema de counterNotif existente
+    const unsub = onForegroundMessage((payload) => {
+      const title = payload.notification?.title ?? ''
+      const body  = payload.notification?.body  ?? ''
+      const text  = title && body ? `${title}: ${body}` : (body || title)
+      const sharedId = payload.data?.sharedId ?? null
+      // Buscar el contador local asociado a este sharedId
+      const linkedCounter = sharedId
+        ? useAppStore.getState().counters.find(c => c.sharedId === sharedId)
+        : null
+      clearTimeout(counterNotifTimer.current)
+      setCounterNotif({ text, counterId: linkedCounter?.id ?? null })
+      counterNotifTimer.current = setTimeout(() => setCounterNotif(null), 4000)
+    })
+    return () => unsub?.()
+  }, [user?.uid]) // eslint-disable-line
 
   // ── Deep link: ?code= pasado desde App.jsx vía route state ─────────────
   // Observar pendingCode para que funcione tanto si el usuario ya estaba
@@ -433,11 +461,14 @@ export default function MainPage() {
   // ── SortableJS ────────────────────────────────────────────────────────────
   const sortableItems = items.map(item => ({ ...item, id: getItemKey(item) }))
 
-  // Ref para saber qué ítem se está arrastrando (sin causar re-render)
-  const draggingKeyRef = useRef(null)
-  const [isDraggingMulti, setIsDraggingMulti] = useState(false)
+  // ── Drag stack overlay (replica de la app Android) ──────────────────────────
+  const draggingKeyRef    = useRef(null)
+  const stackHiddenRef    = useRef([])   // elementos DOM originales ocultos
+  const stackClonesRef    = useRef([])   // { el, startX, startY, width, height, offset }
+  const stackMoveRef      = useRef(null) // handler pointermove/touchmove
+  const stackRafRef       = useRef(null) // rAF id de la animación
 
-  // Aplica el multi-move: todos los seleccionados quedan junto al ítem arrastrado
+  // Aplica el multi-move al soltar: todos los seleccionados quedan junto al arrastrado
   const applyMultiMove = (order, draggedKey) => {
     if (!draggedKey || !selectedKeys.has(draggedKey) || selectedKeys.size <= 1) return order
     const others = order.filter(k => k !== draggedKey && selectedKeys.has(k))
@@ -456,35 +487,114 @@ export default function MainPage() {
     cancelLongPress()
     const dk = evt.item?.getAttribute('data-id') ?? null
     draggingKeyRef.current = dk
-    const isMulti = dk && selectedKeys.has(dk) && selectedKeys.size > 1
-    setIsDraggingMulti(!!isMulti)
-    if (isMulti) {
-      // Inyectar badge de conteo en el ghost de SortableJS
-      setTimeout(() => {
-        const ghost = document.querySelector('.sortable-fallback')
-        if (ghost && !ghost.querySelector('[data-drag-badge]')) {
-          ghost.style.overflow = 'visible'
-          const badge = document.createElement('span')
-          badge.setAttribute('data-drag-badge', '1')
-          badge.style.cssText = [
-            'position:absolute', 'top:-10px', 'right:-10px',
-            'background:#1E88E5', 'color:#fff', 'border-radius:50%',
-            'width:24px', 'height:24px', 'display:flex',
-            'align-items:center', 'justify-content:center',
-            'font-size:12px', 'font-weight:700',
-            'box-shadow:0 2px 8px rgba(0,0,0,.4)',
-            'pointer-events:none', 'z-index:9999',
-          ].join(';')
-          badge.textContent = selectedKeys.size
-          ghost.appendChild(badge)
-        }
-      }, 0)
+    if (!dk || !selectedKeys.has(dk) || selectedKeys.size <= 1) return
+
+    // ── Crear clones flotantes de los otros ítems seleccionados ─────────────
+    const container = evt.from
+    const clones = []
+    const hidden = []
+
+    for (const child of Array.from(container.children)) {
+      const key = child.getAttribute('data-id')
+      if (!key || key === dk || !selectedKeys.has(key)) continue
+
+      const rect = child.getBoundingClientRect()
+      const clone = child.cloneNode(true)
+
+      // Posicionar el clon encima del ítem original (posición fija en viewport)
+      clone.style.cssText = `
+        position:fixed;left:0;top:0;
+        width:${rect.width}px;height:${rect.height}px;
+        transform:translate(${rect.left}px,${rect.top}px);
+        pointer-events:none;border-radius:16px;overflow:hidden;
+        box-shadow:0 8px 28px rgba(0,0,0,.32);opacity:.9;
+        will-change:transform;z-index:99990;
+      `
+      // Quitar overlay de selección del clon
+      clone.querySelector('[data-sel-overlay]')?.remove()
+
+      document.body.appendChild(clone)
+
+      // Offset aleatorio para el efecto de "pila" (igual que Android)
+      const offset = {
+        dx:  (Math.random() - 0.5) * 22,
+        dy:  (Math.random() - 0.5) * 22,
+        rot: (Math.random() - 0.5) * 12,
+      }
+      clones.push({ el: clone, startX: rect.left, startY: rect.top,
+                    width: rect.width, height: rect.height, offset })
+
+      // Ocultar el original (mantiene su espacio en el grid, como SortableJS con el dragged)
+      child.style.opacity = '0'
+      hidden.push(child)
     }
+
+    stackClonesRef.current = clones
+    stackHiddenRef.current = hidden
+
+    // Posición inicial del drag (centro del ítem arrastrado)
+    const ghostRect = evt.item.getBoundingClientRect()
+    let px = ghostRect.left + ghostRect.width  / 2
+    let py = ghostRect.top  + ghostRect.height / 2
+
+    // Seguir el puntero/dedo
+    const onMove = (e) => {
+      px = e.touches ? e.touches[0].clientX : e.clientX
+      py = e.touches ? e.touches[0].clientY : e.clientY
+    }
+    document.addEventListener('pointermove', onMove, { passive: true })
+    document.addEventListener('touchmove',   onMove, { passive: true })
+    stackMoveRef.current = onMove
+
+    // Animación fly-in estilo Android: cada clon vuela desde su posición original
+    // hasta quedar apilado detrás del cursor (con stagger como la app)
+    const FLY_DURATION = 260
+    const FLY_STAGGER  = 40
+    const startTime = performance.now()
+
+    const animate = () => {
+      const elapsed = performance.now() - startTime
+      clones.forEach((c, i) => {
+        const cardElapsed = elapsed - i * FLY_STAGGER
+        const targetX = px - c.width  / 2 + c.offset.dx
+        const targetY = py - c.height / 2 + c.offset.dy
+
+        let x, y, rot
+        if (cardElapsed <= 0) {
+          x = c.startX; y = c.startY; rot = 0
+        } else {
+          const rawT = Math.min(1, cardElapsed / FLY_DURATION)
+          const t = 1 - Math.pow(1 - rawT, 3)  // ease-out cúbico (= DecelerateInterpolator)
+          x   = c.startX + (targetX - c.startX) * t
+          y   = c.startY + (targetY - c.startY) * t
+          rot = c.offset.rot * t
+        }
+        c.el.style.transform = `translate(${x}px,${y}px) rotate(${rot}deg)`
+      })
+      stackRafRef.current = requestAnimationFrame(animate)
+    }
+    stackRafRef.current = requestAnimationFrame(animate)
   }
 
   const handleDragEnd = () => {
+    // Eliminar clones del overlay
+    stackClonesRef.current.forEach(c => c.el.parentNode?.removeChild(c.el))
+    stackClonesRef.current = []
+
+    // Restaurar ítems originales ocultos
+    stackHiddenRef.current.forEach(el => { el.style.opacity = '' })
+    stackHiddenRef.current = []
+
+    // Limpiar listeners y animación
+    if (stackMoveRef.current) {
+      document.removeEventListener('pointermove', stackMoveRef.current)
+      document.removeEventListener('touchmove',   stackMoveRef.current)
+      stackMoveRef.current = null
+    }
+    cancelAnimationFrame(stackRafRef.current)
+    stackRafRef.current = null
+
     draggingKeyRef.current = null
-    setIsDraggingMulti(false)
     push()
   }
 
@@ -772,7 +882,8 @@ export default function MainPage() {
             const isSelected = selectedKeys.has(key)
             return (
               <div key={key}
-                className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''} ${isDraggingMulti && isSelected && key !== draggingKeyRef.current ? styles.gridItemFollowing : ''}`}
+                data-id={key}
+                className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
@@ -802,7 +913,7 @@ export default function MainPage() {
                 )}
                 {/* Overlay modo selección: checkbox */}
                 {selectionMode && (
-                  <div className={`${styles.checkbox} ${isSelected ? styles.checkboxOn : ''}`}
+                  <div data-sel-overlay="1" className={`${styles.checkbox} ${isSelected ? styles.checkboxOn : ''}`}
                     onPointerDown={e => { e.stopPropagation(); toggleSelect(key) }}>
                     {isSelected && (
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">

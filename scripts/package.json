@@ -1,0 +1,13 @@
+{
+  "name": "countall-seed",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Script para poblar Firebase RTDB con datos simulados",
+  "type": "commonjs",
+  "scripts": {
+    "seed": "node seedDatabase.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

@@ -25,7 +25,7 @@ const MY_UID = 'iOEd0Rin9XSwnoMMio0y7Q2J3p43'
  * Tu username en la app. Si todavía no tienes uno configurado, pon cualquier
  * valor temporal; los amigos lo usarán como referencia de quién los invitó.
  */
-const MY_USERNAME = 'mi_usuario'
+const MY_USERNAME = 'pablocousep'
 
 // ─── Init Firebase Admin ──────────────────────────────────────────────────────
 

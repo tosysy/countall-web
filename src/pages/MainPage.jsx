@@ -1374,7 +1374,9 @@ export default function MainPage() {
           ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&bgcolor=ffffff&color=000000&data=${encodeURIComponent(shareUrl)}`
           : null
         const ROLE_LABEL = { owner: 'Propietario', editor: 'Editor', viewer: 'Solo lectura' }
-        const ROLE_COLOR = { owner: 'var(--btn-plus)', editor: '#1E88E5', viewer: 'var(--text-secondary)' }
+        // Como Android: accent (negro en claro / blanco en oscuro) con el texto invertido
+        const ROLE_BG   = { owner: 'var(--text-primary)', editor: '#1E88E5', viewer: 'var(--text-secondary)' }
+        const ROLE_TEXT = { owner: 'var(--bg)', editor: '#fff', viewer: 'var(--bg)' }
         const isOwner = counter.role === 'owner'
         const avatarColorOf = (name = '') => {
           let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0
@@ -1472,8 +1474,8 @@ export default function MainPage() {
                         )}
                       </div>
                       {/* Chip de rol coloreado (como Android) */}
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', padding: '3px 8px',
-                        borderRadius: 20, background: ROLE_COLOR[m.role] ?? 'var(--text-secondary)', flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: ROLE_TEXT[m.role] ?? 'var(--bg)', padding: '3px 8px',
+                        borderRadius: 20, background: ROLE_BG[m.role] ?? 'var(--text-secondary)', flexShrink: 0 }}>
                         {ROLE_LABEL[m.role] ?? m.role}
                       </span>
                     </div>

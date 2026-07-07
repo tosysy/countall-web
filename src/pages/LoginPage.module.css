@@ -91,3 +91,69 @@
   margin-top: 24px;
   line-height: 1.5;
 }
+
+.emailBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  margin-top: 10px;
+  padding: 13px;
+  border-radius: 14px;
+  border: 1.5px solid var(--card-stroke);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.emailBtn:hover { background: var(--card-stroke); }
+
+.emailForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.input {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--card-stroke);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+}
+
+.input:focus { border-color: var(--btn-plus); }
+
+.emailLinks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.linkBtn:hover { color: var(--text-primary); }
+
+.info {
+  color: #4CAF50;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 12px;
+}

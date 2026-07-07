@@ -5,6 +5,11 @@ import {
   getRedirectResult,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  linkWithPopup,
 } from 'firebase/auth'
 import { ref, set, get, remove } from 'firebase/database'
 import { auth, db } from './config'
@@ -75,6 +80,49 @@ export async function refreshDriveToken() {
 
 export async function signOut() {
   await firebaseSignOut(auth)
+}
+
+// ─── Email / contraseña (como Android: requiere email verificado) ────────────
+
+/** Crea la cuenta y envía el email de verificación. Cierra la sesión hasta verificar. */
+export async function registerWithEmail(email, password) {
+  const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
+  try { await sendEmailVerification(cred.user) } catch { /* reintenta al entrar */ }
+  await firebaseSignOut(auth)
+}
+
+/**
+ * Inicia sesión con email/contraseña. Si el correo no está verificado,
+ * reenvía la verificación, cierra sesión y lanza un error legible.
+ */
+export async function signInWithEmail(email, password) {
+  const cred = await signInWithEmailAndPassword(auth, email.trim(), password)
+  if (!cred.user.emailVerified) {
+    try { await sendEmailVerification(cred.user) } catch { /* límite de envío */ }
+    await firebaseSignOut(auth)
+    const err = new Error('Verifica tu correo antes de entrar. Te hemos reenviado el enlace de verificación.')
+    err.code = 'auth/email-not-verified'
+    throw err
+  }
+  return cred.user
+}
+
+export async function resetPassword(email) {
+  await sendPasswordResetEmail(auth, email.trim())
+}
+
+/** Vincula Google a la cuenta actual (email/contraseña) para poder entrar con ambos. */
+export async function linkGoogleAccount() {
+  if (!auth.currentUser) throw new Error('No autenticado')
+  const provider = buildGoogleProvider()
+  const result = await linkWithPopup(auth.currentUser, provider)
+  const credential = GoogleAuthProvider.credentialFromResult(result)
+  return { user: result.user, accessToken: credential?.accessToken ?? null }
+}
+
+/** Proveedores vinculados a la sesión actual, p. ej. ['password','google.com']. */
+export function linkedProviders() {
+  return auth.currentUser?.providerData?.map(p => p.providerId) ?? []
 }
 
 export function onAuthChange(callback) {

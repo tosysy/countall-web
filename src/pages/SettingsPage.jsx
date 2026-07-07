@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { updateProfile } from 'firebase/auth'
 import { auth } from '../firebase/config'
-import { isUsernameAvailable, setUsername, signOut as firebaseSignOut } from '../firebase/auth'
+import { isUsernameAvailable, setUsername, signOut as firebaseSignOut, linkGoogleAccount, linkedProviders } from '../firebase/auth'
 import { deleteAccount } from '../firebase/syncManager'
 import { unregisterFcmToken } from '../firebase/messagingManager'
 import { getOwnProfile, saveProfileFields, uploadProfilePhoto } from '../firebase/profileManager'
@@ -208,16 +208,40 @@ export default function SettingsPage() {
 
           <div className={styles.divider} />
 
-          {/* Google account */}
-          <div className={styles.row}>
-            <div className={styles.iconCircleGreen}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          {/* Cuenta / proveedores */}
+          {linkedProviders().includes('google.com') ? (
+            <div className={styles.row}>
+              <div className={styles.iconCircleGreen}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              </div>
+              <div className={styles.rowTextCol}>
+                <span className={styles.rowMain}>Cuenta de Google vinculada</span>
+                <span className={styles.rowSub}>{user?.email ?? ''}</span>
+              </div>
             </div>
-            <div className={styles.rowTextCol}>
-              <span className={styles.rowMain}>Cuenta de Google vinculada</span>
-              <span className={styles.rowSub}>{user?.email ?? ''}</span>
-            </div>
-          </div>
+          ) : (
+            <button className={styles.rowBtn} onClick={async () => {
+              try {
+                await linkGoogleAccount()
+                showToast('Cuenta de Google vinculada')
+              } catch (e) {
+                showToast(e.code === 'auth/credential-already-in-use'
+                  ? 'Esa cuenta de Google ya está en uso'
+                  : 'No se pudo vincular: ' + e.message)
+              }
+            }}>
+              <div className={styles.iconCircleGreen}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+              </div>
+              <div className={styles.rowTextCol}>
+                <span className={styles.rowMain}>Vincular cuenta de Google</span>
+                <span className={styles.rowSub}>{user?.email ?? ''} (correo y contraseña)</span>
+              </div>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+              </svg>
+            </button>
+          )}
 
           <div className={styles.divider} />
 

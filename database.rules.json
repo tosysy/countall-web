@@ -1,0 +1,75 @@
+{
+  "rules": {
+    "sharedCounters": {
+      "$sharedId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "sharedFolders": {
+      "$sharedId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "appConfig": {
+      ".read": true,
+      ".write": false
+    },
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "publicProfiles": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "usernames": {
+      ".read": "auth != null",
+      "$username": {
+        ".write": "auth != null && (!data.exists() || data.val() === auth.uid || newData.val() === auth.uid)"
+      }
+    },
+    "invites": {
+      ".read": true,
+      "$code": {
+        ".write": "auth != null"
+      }
+    },
+    "devices": {
+      "$deviceId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "invitations": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "auth != null"
+      }
+    },
+    "sentInvitations": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "auth != null"
+      }
+    },
+    "friends": {
+      "$uid": {
+        ".read": "auth != null && ($uid === auth.uid || root.child('friends').child($uid).child(auth.uid).child('status').val() === 'accepted')",
+        "$friendUid": {
+          ".write": "auth != null && ($uid === auth.uid || $friendUid === auth.uid)"
+        }
+      }
+    },
+    "instagramOAuth": {
+      "$nonce": {
+        ".write": "auth != null && newData.child('uid').val() === auth.uid"
+      }
+    }
+  }
+}

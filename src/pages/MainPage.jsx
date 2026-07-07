@@ -751,7 +751,7 @@ export default function MainPage() {
     finally { setFolderLoading(false) }
   }
 
-  const INVITE_BASE = 'https://tosysy.github.io/countall-web/?code='
+  const INVITE_BASE = 'https://tosysy.github.io/CountAll/?code='
   const handleCopyFolderCode = () => {
     if (!folderInviteCode) return
     navigator.clipboard.writeText(INVITE_BASE + folderInviteCode).catch(() => {})
@@ -1320,7 +1320,7 @@ export default function MainPage() {
       {/* ── Hoja de info compartida ──────────────────────────────────────── */}
       {sharedInfoSheet && (() => {
         const { counter, inviteCode, members } = sharedInfoSheet
-        const INVITE_BASE = 'https://tosysy.github.io/countall-web/?code='
+        const INVITE_BASE = 'https://tosysy.github.io/CountAll/?code='
         const qrUrl = inviteCode
           ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=ffffff&color=000000&data=${encodeURIComponent(INVITE_BASE + inviteCode)}`
           : null

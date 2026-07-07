@@ -7,19 +7,24 @@ import {
   query as dbQuery, orderByKey, startAt, endAt, limitToFirst,
 } from 'firebase/database'
 import { db, auth } from './config'
+import { downloadBundle, hasBundleData, deleteAllAppData } from './driveManager'
 import {
-  uploadBundle, downloadBundle, hasBundleData,
-  uploadBackground as driveUploadBg, downloadBackground as driveDownloadBg,
-  downloadAllBackgrounds, deleteBackground as driveDeleteBg, deleteAllAppData,
-} from './driveManager'
+  uploadSyncBundle, downloadSyncBundle, deleteAllPersonal,
+} from './personalBackup'
 import {
   sharedCounterPath, folderPath, uploadBackground as storageUpload,
   deleteBackground as storageDelete, downloadBackgroundUrl,
 } from './storageManager'
+import { getDeviceId } from './deviceId'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function uid() { return auth.currentUser?.uid ?? null }
+
+// Evita que un navegador recién abierto (estado vacío) pise el bundle remoto
+// antes de haber hecho el pull inicial. App.jsx lo activa tras aplicar los datos.
+let _syncReady = false
+export function setSyncReady(ready) { _syncReady = ready }
 
 function newId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -35,7 +40,7 @@ export async function pushCounterUpdate(counter) {
   const base = {
     name: counter.name, increment: counter.increment,
     target: counter.target ?? null, color: counter.color ?? null,
-    lastModifiedBy: me, lastModifiedDeviceId: 'web',
+    lastModifiedBy: me, lastModifiedDeviceId: getDeviceId(),
     lastModifiedUsername: auth.currentUser?.displayName ?? '',
     lastModifiedTimestamp: serverTimestamp(),
   }
@@ -44,8 +49,8 @@ export async function pushCounterUpdate(counter) {
     await update(ref(db, `sharedCounters/${counter.sharedId}/data`), base)
     await set(ref(db, `sharedCounters/${counter.sharedId}/scores/${me}`), {
       value: counter.value,
-      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
-      deviceId: 'web',
+      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date, author: e.author ?? me })),
+      deviceId: getDeviceId(),
     })
     // Per-user color and target
     if (counter.userColors?.[me] !== undefined) {
@@ -62,7 +67,7 @@ export async function pushCounterUpdate(counter) {
     await update(ref(db, `sharedCounters/${counter.sharedId}/data`), {
       ...base,
       value: counter.value,
-      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
+      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date, author: e.author ?? me })),
     })
   }
 }
@@ -96,7 +101,7 @@ export function listenSharedCounter(sharedId, localId, onUpdate, onDeleted) {
       backgroundImageUrl: data.child('backgroundImageUrl').val() ?? null,
       role: member.child('role').val() ?? 'viewer',
       isCompetitive: isComp,
-      fromRemote: lastDeviceId !== 'web',
+      fromRemote: lastDeviceId !== getDeviceId(),
       lastModifiedBy: data.child('lastModifiedBy').val() ?? '',
       lastModifiedUsername: data.child('lastModifiedUsername').val() ?? '',
     }
@@ -110,7 +115,7 @@ export function listenSharedCounter(sharedId, localId, onUpdate, onDeleted) {
         scores[s.key] = s.child('value').val() ?? 0
         const logs = []
         s.child('logEntries').forEach(e => {
-          logs.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0 })
+          logs.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0, author: e.child('author').val() ?? null })
         })
         if (logs.length > 0) competitorLogEntries[s.key] = logs
       })
@@ -122,18 +127,18 @@ export function listenSharedCounter(sharedId, localId, onUpdate, onDeleted) {
       upd.competitorTargets = competitorTargets
       upd.competitorLogEntries = competitorLogEntries
       const myScore = snap.child(`scores/${me}`)
-      if (myScore.exists() && myScore.child('deviceId').val() !== 'web') {
+      if (myScore.exists() && myScore.child('deviceId').val() !== getDeviceId()) {
         upd.myValue = myScore.child('value').val() ?? 0
         upd.myLogEntries = []
         myScore.child('logEntries').forEach(e => {
-          upd.myLogEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0 })
+          upd.myLogEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0, author: e.child('author').val() ?? null })
         })
       }
-    } else if (lastDeviceId !== 'web') {
+    } else if (lastDeviceId !== getDeviceId()) {
       upd.value = data.child('value').val() ?? 0
       upd.logEntries = []
       data.child('logEntries').forEach(e => {
-        upd.logEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0 })
+        upd.logEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0, author: e.child('author').val() ?? null })
       })
     }
 
@@ -161,7 +166,7 @@ export async function shareCounter(counter, competitive = false) {
     name: counter.name, increment: counter.increment,
     target: counter.target ?? null, color: counter.color ?? null,
     backgroundImageUrl: counter.backgroundImageUrl ?? null,
-    localId: counter.id, lastModifiedBy: me, lastModifiedDeviceId: 'web',
+    localId: counter.id, lastModifiedBy: me, lastModifiedDeviceId: getDeviceId(),
     lastModifiedUsername: username, lastModifiedTimestamp: serverTimestamp(),
   }
 
@@ -170,12 +175,12 @@ export async function shareCounter(counter, competitive = false) {
     await set(ref(db, `sharedCounters/${sharedId}/data`), baseData)
     await set(ref(db, `sharedCounters/${sharedId}/scores/${me}`), {
       value: counter.value,
-      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
-      deviceId: 'web',
+      logEntries: counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date, author: e.author ?? me })),
+      deviceId: getDeviceId(),
     })
   } else {
     baseData.value = counter.value
-    baseData.logEntries = counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date }))
+    baseData.logEntries = counter.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date, author: e.author ?? me }))
     await set(ref(db, `sharedCounters/${sharedId}/data`), baseData)
   }
 
@@ -252,7 +257,7 @@ export async function joinSharedCounter(sharedId) {
   }
   if (!isComp) {
     dataSnap.child('logEntries').forEach(e => {
-      counter.logEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0 })
+      counter.logEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0, author: e.child('author').val() ?? null })
     })
   }
   return counter
@@ -407,7 +412,7 @@ export async function acceptInvitation(invitation) {
   }
   if (!isComp) {
     dSnap.child('logEntries').forEach(e => {
-      counter.logEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0 })
+      counter.logEntries.push({ label: e.child('label').val() ?? '', text: e.child('text').val() ?? '', date: e.child('date').val() ?? 0, author: e.child('author').val() ?? null })
     })
   }
 
@@ -529,43 +534,59 @@ export function listenFriendRequests(onUpdate) {
   return () => off(r, 'value', handler)
 }
 
-// ─── Datos personales: Google Drive ──────────────────────────────────────────
+// ─── Datos personales: RTDB syncBundle (mismo canal que Android) ─────────────
 
 let _syncDebounceTimer = null
 
 /**
- * Empuja los datos personales a Drive y actualiza dataVersion en RTDB.
- * Debounce de 1.5s igual que Android.
+ * Empuja los datos personales a users/{uid}/syncBundle y actualiza dataVersion.
+ * Debounce de 1.5s igual que Android. El último parámetro (antes driveToken)
+ * se acepta y se ignora para no romper llamadas existentes.
  */
-export function schedulePushPersonalData(counters, folders, gridOrder, folderOrders, driveToken) {
+export function schedulePushPersonalData(counters, folders, gridOrder, folderOrders) {
   clearTimeout(_syncDebounceTimer)
   _syncDebounceTimer = setTimeout(async () => {
-    await pushPersonalData(counters, folders, gridOrder, folderOrders, driveToken)
+    await pushPersonalData(counters, folders, gridOrder, folderOrders)
   }, 1500)
 }
 
-export async function pushPersonalData(counters, folders, gridOrder, folderOrders, driveToken) {
-  if (!driveToken) return
+export async function pushPersonalData(counters, folders, gridOrder, folderOrders) {
+  if (!_syncReady) return
   const me = uid(); if (!me) return
 
+  const version = Date.now()
   const bundle = JSON.stringify({
-    deviceId: 'web',
-    version: Date.now(),
+    deviceId: getDeviceId(),
+    version,
     counters: counters.map(buildCounterJson),
     folders: folders.map(buildFolderJson),
     gridOrder,
     folderOrders,
   })
 
-  await uploadBundle(bundle, driveToken)
-  await set(ref(db, `users/${me}/dataVersion`), Date.now())
+  const ok = await uploadSyncBundle(bundle)
+  if (ok) await set(ref(db, `users/${me}/dataVersion`), version)
 }
 
-export async function pullPersonalData(driveToken) {
-  if (!driveToken) return null
-  const bundleStr = await downloadBundle(driveToken)
+/** Lee el bundle personal desde RTDB (con fallback a Storage, igual que Android). */
+export async function pullPersonalData() {
+  const bundleStr = await downloadSyncBundle()
   if (!bundleStr) return null
   try { return JSON.parse(bundleStr) } catch { return null }
+}
+
+/**
+ * Import único desde Google Drive para usuarios antiguos de la web:
+ * si no hay syncBundle en RTDB pero sí bundle en Drive, lo devuelve
+ * para aplicarlo y re-subirlo al canal nuevo.
+ */
+export async function pullLegacyDriveData(driveToken) {
+  if (!driveToken) return null
+  try {
+    const bundleStr = await downloadBundle(driveToken)
+    if (!bundleStr) return null
+    return JSON.parse(bundleStr)
+  } catch { return null }
 }
 
 export function listenDataVersion(onNewVersion) {
@@ -643,8 +664,12 @@ export async function deleteAccount(driveToken) {
   await remove(ref(db, `invitations/${me}`)).catch(() => {})
   await remove(ref(db, `sentInvitations/${me}`)).catch(() => {})
   if (username) await remove(ref(db, `usernames/${username.toLowerCase()}`)).catch(() => {})
+
+  // Bundle personal + fondos (RTDB syncBundle y Storage personal/{uid}/)
+  await deleteAllPersonal().catch(() => {})
   await remove(ref(db, `users/${me}`)).catch(() => {})
 
+  // Limpieza de datos legados en Drive (si tenemos token)
   if (driveToken) await deleteAllAppData(driveToken).catch(() => {})
 }
 
@@ -661,7 +686,7 @@ function buildCounterJson(c) {
     isShared: c.isShared, sharedId: c.sharedId ?? null,
     ownerId: c.ownerId ?? null, ownerUsername: c.ownerUsername ?? null,
     role: c.role ?? 'owner',
-    logEntries: c.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date })),
+    logEntries: c.logEntries.map(e => ({ label: e.label ?? null, text: e.text, date: e.date, author: e.author ?? null })),
   }
 }
 
@@ -806,7 +831,7 @@ export async function shareFolder(folder, countersInFolder = []) {
   await set(ref(db, `sharedFolders/${sharedId}/data`), {
     name: folder.name, color: folder.color ?? null,
     backgroundImageUrl: folder.backgroundImageUrl ?? null,
-    localId: folder.id, lastModifiedBy: me, lastModifiedDeviceId: 'web',
+    localId: folder.id, lastModifiedBy: me, lastModifiedDeviceId: getDeviceId(),
   })
   await set(ref(db, `sharedFolders/${sharedId}/inviteCode`), inviteCode)
   await set(ref(db, `invites/${inviteCode}`), { sharedId, createdBy: me, createdAt: serverTimestamp(), isFolder: true })
@@ -909,7 +934,7 @@ export function pushFolderUpdate(folder) {
     color: folder.color ?? null,
     backgroundImageUrl: folder.backgroundImageUrl ?? null,
     lastModifiedBy: me,
-    lastModifiedDeviceId: 'web',
+    lastModifiedDeviceId: getDeviceId(),
   }
   update(ref(db, `sharedFolders/${folder.sharedId}/data`), updates)
 }

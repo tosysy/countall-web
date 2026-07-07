@@ -5,11 +5,13 @@ import ColorPicker from './ColorPicker'
 import CompetitivePodium, { getProgressColor } from './CompetitivePodium'
 import { pushCounterUpdate, getMembers, setMemberRole, removeMember, sendInvitation, getInviteCode, shareCounter, unshareCounter, requestEditPermission, bumpBgVersion, getFriends } from '../firebase/syncManager'
 import { uploadBackground as storageUpload, sharedCounterPath } from '../firebase/storageManager'
-import { uploadBackground as driveUploadBg, deleteBackground as driveDeleteBg } from '../firebase/driveManager'
+import { uploadBackground as pbUploadBg, deleteBackground as pbDeleteBg } from '../firebase/personalBackup'
 import useAppStore from '../store/appStore'
 
-// URL base para compartir — los QR y los "Copiar enlace" apuntan aquí
-const INVITE_BASE = 'https://tosysy.github.io/countall-web/?code='
+// URL base para compartir — la misma que genera la app Android: la página
+// tosysy.github.io/CountAll enruta al destino correcto (app nativa en Android,
+// web app en iOS/escritorio) conservando el código.
+const INVITE_BASE = 'https://tosysy.github.io/CountAll/?code='
 const inviteUrl = (code) => INVITE_BASE + code
 
 // QR code via free API (no library needed)
@@ -23,7 +25,7 @@ function luminance(hex) {
 }
 
 export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false, initialTab = 'log', onRemoveFromFolder }) {
-  const { user, username, driveToken } = useAppStore()
+  const { user, username } = useAppStore()
 
   const isOwner = counter.role === 'owner'
   const canEdit = counter.role === 'owner' || counter.role === 'editor'
@@ -228,12 +230,10 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
         } catch { onUpdate({ backgroundImageLocal: url }) }
       } else {
         onUpdate({ backgroundImageLocal: url })
-        // Upload to Drive for cross-device sync (igual que Android pushPersonalCounterBackground)
-        if (driveToken) {
-          driveUploadBg(counter.id, file, driveToken)
-            .then(() => bumpBgVersion())
-            .catch(() => {}) // fail silently — background stays local
-        }
+        // Subir a Storage personal/{uid}/backgrounds (mismo canal que Android)
+        pbUploadBg(counter.id, file)
+          .then(() => bumpBgVersion())
+          .catch(() => {}) // fail silently — background stays local
       }
     }
     input.click()
@@ -243,9 +243,9 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
     onUpdate({ backgroundImageUrl: null, backgroundImageLocal: null })
     if (counter.isShared) {
       pushCounterUpdate({ ...counter, backgroundImageUrl: null })
-    } else if (driveToken) {
-      // Delete from Drive (igual que Android deleteCounterBackground para personales)
-      driveDeleteBg(counter.id, driveToken).catch(() => {})
+    } else {
+      // Borrar del Storage personal (igual que Android deleteCounterBackground)
+      pbDeleteBg(counter.id).catch(() => {})
       bumpBgVersion().catch(() => {})
     }
   }

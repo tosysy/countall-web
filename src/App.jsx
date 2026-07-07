@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { onAuthChange, handleRedirectResult, getUsername, refreshDriveToken } from './firebase/auth'
-import { listenDataVersion, listenBgVersion, pullPersonalData, restoreLinkedSharedItems } from './firebase/syncManager'
-import { downloadAllBackgrounds } from './firebase/driveManager'
+import {
+  listenDataVersion, listenBgVersion, pullPersonalData, pullLegacyDriveData,
+  restoreLinkedSharedItems, setSyncReady,
+} from './firebase/syncManager'
+import {
+  uploadSyncBundle, downloadAllBackgrounds as pbDownloadAllBackgrounds,
+  uploadBackground as pbUploadBackground,
+} from './firebase/personalBackup'
+import { downloadAllBackgrounds as driveDownloadAllBackgrounds } from './firebase/driveManager'
+import { getDeviceId } from './firebase/deviceId'
 import { listenRemoteConfig } from './firebase/remoteConfig'
 import useAppStore from './store/appStore'
 import LoginPage from './pages/LoginPage'
@@ -297,6 +305,7 @@ export default function App() {
         // Resetear flags para que el próximo login funcione correctamente
         tokenRefreshedRef.current = false
         syncInProgressRef.current = false
+        setSyncReady(false)
 
         // Mostrar pantalla de cierre de sesión
         setLoadingScreen({ message: 'Cerrando sesión…', progress: 30, variant: 'signout' })
@@ -331,32 +340,21 @@ export default function App() {
       pendingCodeRef.current = null
       navigate('/', { replace: true, state: pending ? { pendingCode: pending } : undefined })
 
-      // Obtener token de Drive:
-      // 1. Si hay redirect result (flujo signInWithRedirect), usarlo directamente.
-      // 2. Si no (flujo popup o recarga de página), intentar refrescar silenciosamente.
-      //    Usamos tokenRefreshedRef para evitar bucle infinito si signInWithPopup
-      //    re-dispara onAuthStateChanged con el mismo usuario.
-      const redirectRes = await handleRedirectResult()
-      if (redirectRes?.accessToken) {
-        // Flujo redirect: usar token recién obtenido
+      // La sincronización personal ya no depende de Drive: el bundle vive en
+      // RTDB users/{uid}/syncBundle (mismo canal que Android). El token de
+      // Drive solo se usa para importar una vez los datos de usuarios antiguos.
+      if (!tokenRefreshedRef.current) {
         tokenRefreshedRef.current = true
-        setDriveToken(redirectRes.accessToken, Date.now() + 3600_000)
-        initPersonalSync(redirectRes.accessToken)
-      } else if (!tokenRefreshedRef.current) {
-        tokenRefreshedRef.current = true
-        const { driveToken: saved, driveTokenExpiry } = useAppStore.getState()
-        if (saved && Date.now() < driveTokenExpiry) {
-          // Token persistido todavía válido — usarlo directamente (evita popup en recarga)
-          initPersonalSync(saved)
+        const redirectRes = await handleRedirectResult()
+        let token = null
+        if (redirectRes?.accessToken) {
+          token = redirectRes.accessToken
+          setDriveToken(token, Date.now() + 3600_000)
         } else {
-          // Token expirado o ausente — intentar popup silencioso como fallback
-          refreshDriveToken().then(token => {
-            if (token) {
-              setDriveToken(token, Date.now() + 3600_000)
-              initPersonalSync(token)
-            }
-          }).catch(() => {})
+          const { driveToken: saved, driveTokenExpiry } = useAppStore.getState()
+          if (saved && Date.now() < driveTokenExpiry) token = saved
         }
+        initPersonalSync(token)
       }
     }
 
@@ -369,25 +367,54 @@ export default function App() {
     }
   }, []) // eslint-disable-line
 
+  // Importa una sola vez los fondos legados de Drive al Storage de Firebase.
+  const migrateLegacyBackgrounds = async (token) => {
+    if (!token) return {}
+    try {
+      const bgs = await driveDownloadAllBackgrounds(token)
+      for (const [counterId, blobUrl] of Object.entries(bgs)) {
+        try {
+          const blob = await (await fetch(blobUrl)).blob()
+          await pbUploadBackground(counterId, blob)
+        } catch { /* seguir con el resto */ }
+      }
+      return bgs
+    } catch { return {} }
+  }
+
   const initPersonalSync = async (token) => {
-    if (!token) return
     // Evitar doble ejecución (onDriveToken de LoginPage + handleUser pueden coincidir)
     if (syncInProgressRef.current) return
     syncInProgressRef.current = true
 
-    // ── Paso 1: conectar con Drive ───────────────────────────────────────────
-    setLoadingScreen({ message: 'Conectando con Drive…', progress: 10 })
+    // ── Paso 1: descargar datos personales (RTDB syncBundle, canal de Android) ─
+    setLoadingScreen({ message: 'Descargando tus contadores…', progress: 20 })
+    let initialData = await pullPersonalData().catch(() => null)
 
-    // ── Paso 2: descargar datos personales ───────────────────────────────────
-    setLoadingScreen({ message: 'Descargando tus contadores…', progress: 30 })
-    const initialData = await pullPersonalData(token).catch(() => null)
+    // Usuarios antiguos de la web: importar desde Drive una única vez
+    let legacyImported = false
+    if (!initialData) {
+      let driveTok = token ?? useAppStore.getState().driveToken
+      if (!driveTok) {
+        driveTok = await refreshDriveToken().catch(() => null)
+        if (driveTok) setDriveToken(driveTok, Date.now() + 3600_000)
+      }
+      const legacy = await pullLegacyDriveData(driveTok).catch(() => null)
+      if (legacy) {
+        initialData = legacy
+        legacyImported = true
+        // Migrar al canal nuevo para que Android también lo vea
+        uploadSyncBundle(JSON.stringify({ ...legacy, deviceId: getDeviceId() })).catch(() => {})
+        migrateLegacyBackgrounds(driveTok).catch(() => {})
+      }
+    }
 
-    // ── Paso 3: aplicar datos ────────────────────────────────────────────────
-    setLoadingScreen({ message: 'Cargando contadores…', progress: 60 })
+    // ── Paso 2: aplicar datos ────────────────────────────────────────────────
+    setLoadingScreen({ message: 'Cargando contadores…', progress: 55 })
     if (initialData) {
       applyPersonalData(initialData)
     } else {
-      // Sin bundle en Drive: restaurar compartidos desde RTDB como fallback
+      // Sin bundle: restaurar compartidos desde RTDB como fallback
       const store = useAppStore.getState()
       const existingSharedIds = new Set(store.counters.filter(c => c.isShared && c.sharedId).map(c => c.sharedId))
       const existingFolderSharedIds = new Set(store.folders.filter(f => f.isShared && f.sharedId).map(f => f.sharedId))
@@ -401,32 +428,37 @@ export default function App() {
       }
     }
 
-    // ── Paso 4: descargar imágenes de fondo ──────────────────────────────────
+    // ── Paso 3: descargar imágenes de fondo (Storage personal/{uid}/) ────────
     setLoadingScreen({ message: 'Descargando imágenes…', progress: 80 })
     try {
-      const bgs = await downloadAllBackgrounds(token)
+      const bgs = (await pbDownloadAllBackgrounds()) ?? {}
       const store = useAppStore.getState()
       store.counters.forEach(c => {
         if (!c.isShared && bgs[c.id]) updateCounter(c.id, { backgroundImageLocal: bgs[c.id] })
       })
     } catch {}
 
-    // ── Paso 5: listo ────────────────────────────────────────────────────────
+    // ── Paso 4: listo ────────────────────────────────────────────────────────
     setLoadingScreen({ message: '¡Todo listo!', progress: 100 })
+    setSyncReady(true)
+    if (legacyImported) {
+      // Bump inicial para que otros dispositivos (Android) se enteren del import
+      // (pushPersonalData ya lo hará en el próximo cambio; no forzamos aquí)
+    }
     await new Promise(r => setTimeout(r, 450))
     setLoadingScreen(null)
     syncInProgressRef.current = false
 
     // ── Listeners en tiempo real (después de mostrar la UI) ──────────────────
     const unsub1 = listenDataVersion(async () => {
-      const data = await pullPersonalData(token).catch(() => null)
+      const data = await pullPersonalData().catch(() => null)
       if (!data) return
-      if (data.deviceId === 'web') return // propio cambio (ignorar)
+      if (data.deviceId === getDeviceId()) return // propio cambio (ignorar)
       applyPersonalData(data)
     })
 
     const unsub2 = listenBgVersion(async () => {
-      const bgs = await downloadAllBackgrounds(token).catch(() => ({}))
+      const bgs = (await pbDownloadAllBackgrounds().catch(() => null)) ?? {}
       const store = useAppStore.getState()
       store.counters.forEach(c => {
         if (!c.isShared && bgs[c.id]) updateCounter(c.id, { backgroundImageLocal: bgs[c.id] })

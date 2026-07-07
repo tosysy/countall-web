@@ -6,6 +6,7 @@ import FolderCard from '../components/FolderCard'
 import ExpandedCounter from '../components/ExpandedCounter'
 import QrScanner from '../components/QrScanner'
 import ColorPicker from '../components/ColorPicker'
+import Confetti from '../components/Confetti'
 import useAppStore from '../store/appStore'
 import {
   pushCounterUpdate, listenSharedCounter, schedulePushPersonalData,
@@ -56,6 +57,9 @@ export default function MainPage() {
   const [expandedShowMenu, setExpandedShowMenu] = useState(false)
   const [expandedInitialTab, setExpandedInitialTab] = useState('log')
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
   const [sharedInfoSheet, setSharedInfoSheet] = useState(null) // { counter, inviteCode, members }
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
@@ -282,6 +286,12 @@ export default function MainPage() {
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const MAX_VALUE = 999_999_999_999
+
+  // Confeti + vibración al alcanzar la meta (como Android)
+  const celebrateGoal = () => {
+    setShowConfetti(true)
+    try { navigator.vibrate?.([80, 40, 120]) } catch { /* no soportado */ }
+  }
   const handleIncrement = useCallback((counter) => {
     if (counter.value >= MAX_VALUE) return null
     const newLog = [...(counter.logEntries ?? []), { text: '', date: Date.now() }]
@@ -295,8 +305,20 @@ export default function MainPage() {
       const newScores = { ...counter.competitorScores, [uid]: myScore }
       const newTotal = Object.values(newScores).reduce((a, b) => a + b, 0)
       patch = { competitorScores: newScores, value: newTotal, logEntries: newLog }
+      // Celebración al alcanzar MI meta (una sola vez, como Android)
+      const myTarget = counter.competitorTargets?.[uid]
+      if (myTarget && myScore >= myTarget && !counter.goalCelebrated) {
+        patch.goalCelebrated = true
+        celebrateGoal()
+      }
     } else {
-      patch = { value: Math.min(counter.value + counter.increment, MAX_VALUE), logEntries: newLog }
+      const newValue = Math.min(counter.value + counter.increment, MAX_VALUE)
+      patch = { value: newValue, logEntries: newLog }
+      // Celebración al alcanzar la meta (una sola vez, como Android)
+      if (counter.target && newValue >= counter.target && !counter.goalCelebrated) {
+        patch.goalCelebrated = true
+        celebrateGoal()
+      }
     }
 
     updateCounter(counter.id, patch)
@@ -320,11 +342,16 @@ export default function MainPage() {
       const newScores = { ...counter.competitorScores, [uid]: myScore }
       const newTotal = Object.values(newScores).reduce((a, b) => a + b, 0)
       patch = { competitorScores: newScores, value: newTotal, logEntries: newLog }
+      // Rearmar la celebración si bajamos de la meta
+      const myTarget = counter.competitorTargets?.[uid]
+      if (myTarget && myScore < myTarget && counter.goalCelebrated) patch.goalCelebrated = false
     } else {
       if (counter.value <= 0) return null
       const newVal = counter.value - counter.increment
       if (newVal < 0) return null
       patch = { value: newVal, logEntries: newLog }
+      // Rearmar la celebración si bajamos de la meta
+      if (counter.target && newVal < counter.target && counter.goalCelebrated) patch.goalCelebrated = false
     }
 
     updateCounter(counter.id, patch)
@@ -845,6 +872,14 @@ export default function MainPage() {
             {invBadge && <div className="badge-dot" />}
           </div>
 
+          {/* Buscar */}
+          <button className="btn-icon" title="Buscar"
+            onClick={() => { setShowSearch(v => { if (v) setSearchTerm(''); return !v }) }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+          </button>
+
           {/* Ajustes */}
           <button className="btn-icon" onClick={() => navigate('/settings')} title="Ajustes">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
@@ -854,8 +889,71 @@ export default function MainPage() {
         </div>
       </header>}
 
-      {/* ── Grid ───────────────────────────────────────────────────────── */}
-      {items.length === 0 ? (
+      {/* ── Búsqueda por nombre ─────────────────────────────────────────── */}
+      {showSearch && !selectionMode && (
+        <div style={{ padding: '0 16px 12px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            border: '1.5px solid var(--card-stroke)', borderRadius: 14, padding: '10px 14px',
+          }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input autoFocus value={searchTerm} placeholder="Buscar contadores y carpetas..."
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 15 }} />
+            {searchTerm && (
+              <button className="btn-icon" style={{ padding: 2 }} onClick={() => setSearchTerm('')}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Resultados de búsqueda (en todas las carpetas) ─────────────── */}
+      {showSearch && searchTerm.trim() ? (() => {
+        const q = searchTerm.trim().toLowerCase()
+        const matchedCounters = counters.filter(c => c.name?.toLowerCase().includes(q))
+        const matchedFolders = folders.filter(f => f.name?.toLowerCase().includes(q))
+        if (matchedCounters.length === 0 && matchedFolders.length === 0) {
+          return (
+            <div className="empty-state">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <p>Sin resultados para «{searchTerm.trim()}»</p>
+            </div>
+          )
+        }
+        return (
+          <div className="counter-grid">
+            {matchedFolders.map(f => (
+              <div key={`F:${f.id}`} className={styles.gridItem}>
+                <FolderCard
+                  folder={f}
+                  folderCounters={getFolderCounters(f.id)}
+                  subFolders={folders.filter(x => x.parentFolderId === f.id)}
+                  folderOrder={folderOrders[f.id] ?? []}
+                  onClick={(fl) => { setShowSearch(false); setSearchTerm(''); setCurrentFolder(fl.id) }}
+                />
+              </div>
+            ))}
+            {matchedCounters.map(c => (
+              <div key={`C:${c.id}`} className={styles.gridItem}>
+                <CounterCard
+                  counter={c}
+                  onIncrement={() => handleIncrement(useAppStore.getState().counters.find(x => x.id === c.id) ?? c)}
+                  onDecrement={() => handleDecrement(useAppStore.getState().counters.find(x => x.id === c.id) ?? c)}
+                  onClick={(cc) => { setExpandedInitialTab('log'); setExpanded(cc) }}
+                  onSharedBadge={(cc) => openSharedInfo(cc)}
+                />
+              </div>
+            ))}
+          </div>
+        )
+      })() :
+
+      /* ── Grid ───────────────────────────────────────────────────────── */
+      items.length === 0 ? (
         <div className="empty-state">
           <svg viewBox="0 0 24 24" width="56" height="56" fill="currentColor">
             <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
@@ -930,6 +1028,9 @@ export default function MainPage() {
           })}
         </ReactSortable>
       )}
+
+      {/* ── Confeti de celebración de meta ─────────────────────────────── */}
+      {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
 
       {/* ── FAB ────────────────────────────────────────────────────────── */}
       {showFab && (

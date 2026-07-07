@@ -378,9 +378,28 @@ export default function InvitationsPage() {
             {/* Usuario destino */}
             <p className={styles.sendLabel}>Usuario</p>
             <div className={styles.sendInputWrap}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ color:'var(--text-secondary)', flexShrink:0 }}>
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
+              {(() => {
+                // Si el nombre escrito es un amigo, mostrar su foto en el campo
+                const match = friendSuggestions.find(f => f.username.toLowerCase() === sendForm.toUsername.trim().toLowerCase())
+                const photo = match ? profiles[match.uid]?.photoUrl : null
+                if (match) {
+                  return (
+                    <span style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: photo ? 'transparent' : avatarColor(match.username),
+                      color: '#fff', fontWeight: 700, fontSize: 11 }}>
+                      {photo
+                        ? <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : match.username[0]?.toUpperCase()}
+                    </span>
+                  )
+                }
+                return (
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ color:'var(--text-secondary)', flexShrink:0 }}>
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                )
+              })()}
               <input className={styles.sendInput} placeholder="Nombre de usuario"
                 value={sendForm.toUsername}
                 onChange={e => setSendForm(f => ({ ...f, toUsername:e.target.value }))} />

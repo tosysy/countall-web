@@ -29,31 +29,26 @@
   gap: 10px;
 }
 
-.title {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin: 0;
-}
-
+/* Tarjeta de perfil centrada — como activity_user_profile.xml */
 .profileCard {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1.5px solid var(--card-stroke);
+  padding: 28px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--card-stroke);
+  background: var(--card-bg);
 }
 
 .avatarBig {
-  width: 76px;
-  height: 76px;
+  width: 92px;
+  height: 92px;
   border-radius: 50%;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 800;
   color: #fff;
   overflow: hidden;
@@ -65,18 +60,63 @@
   object-fit: cover;
 }
 
-.profileInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+.fullName {
+  margin: 18px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.fullName {
-  font-size: 17px;
-  font-weight: 700;
+.usernameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.username {
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.igIcon {
+  display: inline-flex;
   color: var(--text-primary);
-  margin: 0;
+}
+
+.friendCount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 16px;
+  padding: 4px 16px;
+}
+
+.friendCountNumber {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--text-primary);
+}
+
+.friendCountLabel {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.infoLine {
+  margin: 14px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 .metaLine {
@@ -85,14 +125,31 @@
   margin: 0;
 }
 
-.igLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #E1306C;
-  text-decoration: none;
+/* Botón de acción de amistad — MaterialButton accent de Android */
+.btnAccent {
+  width: 100%;
+  height: 46px;
+  margin-top: 22px;
+  border-radius: 12px;
+  border: none;
+  background: var(--text-primary);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnGhost {
+  width: 100%;
+  height: 46px;
+  margin-top: 22px;
+  border-radius: 12px;
+  border: 1px solid var(--card-stroke);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .btnPrimary {
@@ -100,37 +157,42 @@
   border-radius: 14px;
   border: none;
   background: var(--btn-plus);
-  color: #fff;
+  color: var(--bg);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
 }
 
-.btnGhost {
-  padding: 12px;
-  border-radius: 14px;
-  border: 1.5px solid var(--card-stroke);
-  background: transparent;
+/* Cabecera "Contadores públicos" / carpeta */
+.countersHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.btnExitFolder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: none;
+  background: none;
   color: var(--text-primary);
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.breadcrumb {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-secondary);
-  margin: 0;
+  cursor: pointer;
 }
 
 .sectionTitle {
-  font-size: 14px;
+  flex: 1;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin: 6px 0 0;
+  color: var(--text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid {

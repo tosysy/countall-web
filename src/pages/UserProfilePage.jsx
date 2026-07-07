@@ -75,22 +75,25 @@ export default function UserProfilePage() {
     )
   }
 
-  const currentFolderId = folderStack.length ? folderStack[folderStack.length - 1].id : null
+  const currentFolder = folderStack.length ? folderStack[folderStack.length - 1] : null
+  const currentFolderId = currentFolder?.id ?? null
   const visibleCounters = profile.publicCounters.filter(c => (c.folderId ?? null) === currentFolderId)
   const visibleFolders = profile.publicFolders.filter(f => (f.parentFolderId ?? null) === currentFolderId)
   const birth = formatDate(profile.birthDate)
   const isSelf = myUid === targetUid
+  const infoLine = [birth, GENDER_LABEL[profile.gender]].filter(Boolean).join('  ·  ')
 
   const FRIEND_BTN = {
-    none:     { label: 'Añadir amigo', cls: styles.btnPrimary },
+    none:     { label: 'Agregar amigo', cls: styles.btnAccent },
     sent:     { label: 'Solicitud enviada', cls: styles.btnGhost },
-    received: { label: 'Aceptar solicitud', cls: styles.btnPrimary },
+    received: { label: 'Aceptar solicitud', cls: styles.btnAccent },
     accepted: { label: 'Amigos ✓', cls: styles.btnGhost },
   }[relation]
 
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
+        {/* Header: solo la flecha, como Android */}
         <header className={styles.header}>
           <button className="btn-icon" onClick={() => {
             if (expanded) setExpanded(null)
@@ -101,46 +104,53 @@ export default function UserProfilePage() {
               <path d="M19 12H5M12 5l-7 7 7 7"/>
             </svg>
           </button>
-          <h1 className={styles.title}>@{profile.username}</h1>
         </header>
 
-        {/* Cabecera del perfil */}
+        {/* Tarjeta de perfil centrada (como activity_user_profile) */}
         <div className={styles.profileCard}>
           <div className={styles.avatarBig} style={{ background: profile.photoUrl ? 'transparent' : avatarColor(profile.username) }}>
             {profile.photoUrl
               ? <img src={profile.photoUrl} alt="" className={styles.avatarImg} />
               : (profile.username?.[0]?.toUpperCase() ?? '?')}
           </div>
-          <div className={styles.profileInfo}>
-            {profile.fullName && <p className={styles.fullName}>{profile.fullName}</p>}
-            <p className={styles.metaLine}>
-              {profile.friendCount} amigo{profile.friendCount === 1 ? '' : 's'}
-              {GENDER_LABEL[profile.gender] ? ` · ${GENDER_LABEL[profile.gender]}` : ''}
-            </p>
-            {birth && <p className={styles.metaLine}>🎂 {birth}</p>}
+
+          <p className={styles.fullName}>{profile.fullName || profile.username}</p>
+
+          <div className={styles.usernameRow}>
+            <span className={styles.username}>{profile.username}</span>
             {profile.instagram && (
-              <a className={styles.igLink} href={`https://instagram.com/${profile.instagram}`}
-                target="_blank" rel="noopener noreferrer">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 3.25.15 4.77 1.69 4.92 4.92.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.15 3.23-1.66 4.77-4.92 4.92-1.27.06-1.64.07-4.85.07s-3.58-.01-4.85-.07c-3.26-.15-4.77-1.7-4.92-4.92C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85C2.38 3.92 3.9 2.38 7.15 2.23 8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 2.7.27.27 2.69.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.2 4.36 2.62 6.78 6.98 6.98C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c4.35-.2 6.78-2.62 6.98-6.98.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95C23.78 2.7 21.35.27 17 .07 15.67.01 15.26 0 12 0zm0 5.84A6.16 6.16 0 1 0 18.16 12 6.16 6.16 0 0 0 12 5.84zM12 16a4 4 0 1 1 4-4 4 4 0 0 1-4 4zm6.4-11.85a1.44 1.44 0 1 0 1.44 1.44 1.44 1.44 0 0 0-1.44-1.44z"/></svg>
-                @{profile.instagram}{profile.instagramVerified ? ' ✓' : ''}
+              <a className={styles.igIcon} href={`https://instagram.com/${profile.instagram}`}
+                target="_blank" rel="noopener noreferrer" title={`@${profile.instagram}`}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 3.25.15 4.77 1.69 4.92 4.92.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.15 3.23-1.66 4.77-4.92 4.92-1.27.06-1.64.07-4.85.07s-3.58-.01-4.85-.07c-3.26-.15-4.77-1.7-4.92-4.92C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85C2.38 3.92 3.9 2.38 7.15 2.23 8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 2.7.27.27 2.69.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.2 4.36 2.62 6.78 6.98 6.98C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c4.35-.2 6.78-2.62 6.98-6.98.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95C23.78 2.7 21.35.27 17 .07 15.67.01 15.26 0 12 0zm0 5.84A6.16 6.16 0 1 0 18.16 12 6.16 6.16 0 0 0 12 5.84zM12 16a4 4 0 1 1 4-4 4 4 0 0 1-4 4zm6.4-11.85a1.44 1.44 0 1 0 1.44 1.44 1.44 1.44 0 0 0-1.44-1.44z"/></svg>
               </a>
             )}
           </div>
+
+          {/* Nº de amigos grande, como Android */}
+          <div className={styles.friendCount}>
+            <span className={styles.friendCountNumber}>{profile.friendCount}</span>
+            <span className={styles.friendCountLabel}>amigo{profile.friendCount === 1 ? '' : 's'}</span>
+          </div>
+
+          {infoLine && <p className={styles.infoLine}>{infoLine}</p>}
+
+          {!isSelf && (
+            <button className={FRIEND_BTN.cls} onClick={handleFriendAction}>{FRIEND_BTN.label}</button>
+          )}
         </div>
 
-        {!isSelf && (
-          <button className={FRIEND_BTN.cls} onClick={handleFriendAction}>{FRIEND_BTN.label}</button>
-        )}
-
-        {/* Migas de carpetas públicas */}
-        {folderStack.length > 0 && (
-          <p className={styles.breadcrumb}>
-            📁 {folderStack.map(f => f.name).join(' / ')}
-          </p>
-        )}
-
-        {/* Cuadrícula de contadores/carpetas públicos */}
-        <h3 className={styles.sectionTitle}>Contadores públicos</h3>
+        {/* Cabecera de contadores públicos / carpeta (como Android) */}
+        <div className={styles.countersHeader}>
+          {currentFolder && (
+            <button className={styles.btnExitFolder} onClick={() => setFolderStack(s => s.slice(0, -1))}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M19 12H5M12 5l-7 7 7 7"/>
+              </svg>
+              Salir
+            </button>
+          )}
+          <h3 className={styles.sectionTitle}>{currentFolder ? currentFolder.name : 'Contadores públicos'}</h3>
+        </div>
         {visibleCounters.length === 0 && visibleFolders.length === 0 ? (
           <div className="empty-state">
             <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>

@@ -51,7 +51,8 @@ export default function InvitationsPage() {
     const item = location.state?.sendItem
     if (!item) return
     navigate('/invitations', { replace: true, state: {} })
-    setSendForm(f => ({ ...f, itemId: item.itemId, sharedId: item.sharedId ?? null, itemName: item.itemName, isFolder: item.isFolder ?? false }))
+    // locked: se comparte directamente ese contador, sin selector de elemento
+    setSendForm(f => ({ ...f, itemId: item.itemId, sharedId: item.sharedId ?? null, itemName: item.itemName, isFolder: item.isFolder ?? false, locked: true }))
     setShowSend(true)
   }, []) // eslint-disable-line
 
@@ -62,10 +63,11 @@ export default function InvitationsPage() {
     friendSent.forEach(f => uids.add(f.uid))
     received.forEach(i => i.fromUid && uids.add(i.fromUid))
     sent.forEach(i => i.toUid && uids.add(i.toUid))
+    friendSuggestions.forEach(f => uids.add(f.uid))
     const missing = [...uids].filter(u => !(u in profiles))
     if (missing.length === 0) return
     getProfilesLite(missing).then(p => setProfiles(prev => ({ ...prev, ...p }))).catch(() => {})
-  }, [friendReceived, friendSent, received, sent]) // eslint-disable-line
+  }, [friendReceived, friendSent, received, sent, friendSuggestions]) // eslint-disable-line
 
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(null), 3000) }
 
@@ -84,7 +86,7 @@ export default function InvitationsPage() {
 
   const loadFriendData = async () => {
     const list = await getFriends().catch(() => [])
-    setFriendSuggestions(list.filter(f => f.status === 'accepted').map(f => f.username))
+    setFriendSuggestions(list.filter(f => f.status === 'accepted').map(f => ({ uid: f.uid, username: f.username })))
     setFriendSent(list.filter(f => f.status === 'pending' && f.direction === 'sent'))
   }
 
@@ -212,7 +214,9 @@ export default function InvitationsPage() {
         </button>
         <h1 className={styles.title}>Notificaciones</h1>
         {allOwnedItems.length > 0 && (
-          <button className={styles.btnNew} onClick={() => setShowSend(true)} title="Nueva invitación">
+          <button className={styles.btnNew}
+            onClick={() => { setSendForm({ itemId:'', sharedId:'', itemName:'', toUsername:'', role:'viewer', isFolder:false, locked:false }); setShowSend(true) }}
+            title="Nueva invitación">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
             </svg>
@@ -341,7 +345,9 @@ export default function InvitationsPage() {
         <div className="dialog-backdrop" onClick={() => setShowSend(false)}>
           <div className={styles.sendDialog} onClick={e => e.stopPropagation()}>
             <div className={styles.sendDialogHeader}>
-              <h3 className={styles.sendDialogTitle}>Nueva invitación</h3>
+              <h3 className={styles.sendDialogTitle}>
+                {sendForm.locked ? <>Invitar a «{sendForm.itemName}»</> : 'Nueva invitación'}
+              </h3>
               <button className="btn-icon" onClick={() => setShowSend(false)}>
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                   <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -349,21 +355,25 @@ export default function InvitationsPage() {
               </button>
             </div>
 
-            {/* Seleccionar elemento */}
-            <p className={styles.sendLabel}>Elemento</p>
-            <div className={styles.itemPicker}>
-              {allOwnedItems.map(item => (
-                <button key={item.itemId}
-                  className={`${styles.itemChip} ${sendForm.itemId === item.itemId ? styles.itemChipActive : ''}`}
-                  onClick={() => setSendForm(f => ({ ...f, itemId:item.itemId, sharedId:item.sharedId??null, itemName:item.name, isFolder:item.isFolder }))}>
-                  {item.isFolder
-                    ? <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                    : <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                  }
-                  {item.name}
-                </button>
-              ))}
-            </div>
+            {/* Seleccionar elemento — oculto si se llegó desde un contador concreto */}
+            {!sendForm.locked && (
+              <>
+                <p className={styles.sendLabel}>Elemento</p>
+                <div className={styles.itemPicker}>
+                  {allOwnedItems.map(item => (
+                    <button key={item.itemId}
+                      className={`${styles.itemChip} ${sendForm.itemId === item.itemId ? styles.itemChipActive : ''}`}
+                      onClick={() => setSendForm(f => ({ ...f, itemId:item.itemId, sharedId:item.sharedId??null, itemName:item.name, isFolder:item.isFolder }))}>
+                      {item.isFolder
+                        ? <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                        : <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      }
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Usuario destino */}
             <p className={styles.sendLabel}>Usuario</p>
@@ -382,21 +392,28 @@ export default function InvitationsPage() {
                 </button>
               )}
             </div>
-            {/* Chips de amigos — filtra por lo que se escribe */}
+            {/* Chips de amigos con foto de perfil — filtra por lo que se escribe */}
             {friendSuggestions.length > 0 && (() => {
               const q = sendForm.toUsername.toLowerCase()
-              const visible = friendSuggestions.filter(u =>
-                u !== sendForm.toUsername && (!q || u.toLowerCase().includes(q))
+              const visible = friendSuggestions.filter(f =>
+                f.username !== sendForm.toUsername && (!q || f.username.toLowerCase().includes(q))
               )
               return visible.length > 0 ? (
                 <div className={styles.friendChips}>
-                  {visible.map(u => (
-                    <button key={u} className={styles.friendChip}
-                      onClick={() => setSendForm(f => ({ ...f, toUsername: u }))}>
-                      <span className={styles.friendChipAvatar}>{u[0]?.toUpperCase()}</span>
-                      {u}
-                    </button>
-                  ))}
+                  {visible.map(f => {
+                    const photo = profiles[f.uid]?.photoUrl
+                    return (
+                      <button key={f.uid} className={styles.friendChip}
+                        onClick={() => setSendForm(prev => ({ ...prev, toUsername: f.username }))}>
+                        <span className={styles.friendChipAvatar} style={photo ? { overflow: 'hidden', padding: 0 } : undefined}>
+                          {photo
+                            ? <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            : f.username[0]?.toUpperCase()}
+                        </span>
+                        {f.username}
+                      </button>
+                    )
+                  })}
                 </div>
               ) : null
             })()}

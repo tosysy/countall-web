@@ -105,11 +105,12 @@ export default function OnboardingPage() {
     setPhotoPreview(URL.createObjectURL(f))
   }
 
+  // Valores CANÓNICOS de Android (se guardan tal cual en Firebase)
   const GENDERS = [
-    { id: 'male',   label: 'Hombre',            icon: '👨' },
-    { id: 'female', label: 'Mujer',             icon: '👩' },
-    { id: 'other',  label: 'Otro',              icon: '🧑' },
-    { id: 'na',     label: 'Prefiero no decirlo', icon: '🤐' },
+    { id: 'Hombre', label: 'Hombre', icon: '👨' },
+    { id: 'Mujer',  label: 'Mujer',  icon: '👩' },
+    { id: 'Otro',   label: 'Otro',   icon: '🧑' },
+    { id: 'Prefiero no decirlo', label: 'Prefiero no decirlo', icon: '🤐' },
   ]
 
   return (

@@ -17,7 +17,12 @@ function formatDate(ts) {
   return new Date(ts).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-const GENDER_LABEL = { male: 'Hombre', female: 'Mujer', other: 'Otro' }
+// Android guarda los valores canónicos en español; mapear también los antiguos de la web.
+// "Prefiero no decirlo" no se muestra en la línea de información.
+function genderLabel(g) {
+  if (!g || g === 'Prefiero no decirlo' || g === 'na') return null
+  return { male: 'Hombre', female: 'Mujer', other: 'Otro' }[g] ?? g
+}
 
 /**
  * Perfil público de otro usuario — foto, datos, y sus contadores/carpetas
@@ -94,7 +99,7 @@ export default function UserProfilePage() {
   const visibleFolders = profile.publicFolders.filter(f => (f.parentFolderId ?? null) === currentFolderId)
   const birth = formatDate(profile.birthDate)
   const isSelf = myUid === targetUid
-  const infoLine = [birth, GENDER_LABEL[profile.gender]].filter(Boolean).join('  ·  ')
+  const infoLine = [birth, genderLabel(profile.gender)].filter(Boolean).join('  ·  ')
 
   const FRIEND_BTN = {
     none:     { label: 'Agregar amigo', cls: styles.btnAccent },

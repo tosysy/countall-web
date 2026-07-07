@@ -43,7 +43,9 @@ export default function SettingsPage() {
   // Editor por campo (filas independientes, como Android)
   const openFieldEditor = (field) => {
     setPFullName(profile?.fullName ?? '')
-    setPGender(profile?.gender ?? '')
+    // Normalizar valores antiguos de la web (male/female/…) a los canónicos de Android
+    const legacyGender = { male: 'Hombre', female: 'Mujer', other: 'Otro', na: 'Prefiero no decirlo' }
+    setPGender(legacyGender[profile?.gender] ?? profile?.gender ?? '')
     setPBirthDate(profile?.birthDate ? new Date(profile.birthDate).toISOString().slice(0, 10) : '')
     setPInstagram(profile?.instagram ?? '')
     setEditingProfile(field) // 'fullName' | 'birthDate' | 'instagram' | 'gender'
@@ -260,8 +262,8 @@ export default function SettingsPage() {
           ))}
 
           {/* Fecha de nacimiento + switch de visibilidad */}
-          <div className={styles.row} style={{ paddingRight: 20 }}>
-            <button className={styles.rowBtn} style={{ flex: 1, padding: '14px 12px 14px 20px' }}
+          <div className={styles.row} style={{ padding: '0 16px 0 0', gap: 0 }}>
+            <button className={styles.rowBtn} style={{ flex: 1, paddingRight: 12 }}
               onClick={() => openFieldEditor('birthDate')}>
               <div className={styles.rowTextCol} style={{ flex: 1 }}>
                 <span className={styles.rowSublabel}>Fecha de nacimiento</span>
@@ -307,7 +309,7 @@ export default function SettingsPage() {
             <div className={styles.rowTextCol} style={{ flex: 1 }}>
               <span className={styles.rowSublabel}>Género</span>
               <span className={styles.rowBoldValue}>
-                {{ male: 'Hombre', female: 'Mujer', other: 'Otro', na: 'Prefiero no decirlo' }[profile?.gender] ?? '—'}
+                {{ male: 'Hombre', female: 'Mujer', other: 'Otro', na: 'Prefiero no decirlo' }[profile?.gender] ?? profile?.gender ?? '—'}
               </span>
             </div>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
@@ -456,11 +458,12 @@ export default function SettingsPage() {
 
             {editingProfile === 'gender' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {/* Valores CANÓNICOS de Android (se guardan tal cual en Firebase) */}
                 {[
-                  { id: 'male', label: 'Hombre' },
-                  { id: 'female', label: 'Mujer' },
-                  { id: 'other', label: 'Otro' },
-                  { id: 'na', label: 'Prefiero no decirlo' },
+                  { id: 'Hombre', label: 'Hombre' },
+                  { id: 'Mujer', label: 'Mujer' },
+                  { id: 'Otro', label: 'Otro' },
+                  { id: 'Prefiero no decirlo', label: 'Prefiero no decirlo' },
                 ].map(g => (
                   <button key={g.id}
                     onClick={() => setPGender(g.id)}

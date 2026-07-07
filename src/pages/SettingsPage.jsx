@@ -40,31 +40,32 @@ export default function SettingsPage() {
     getOwnProfile().then(p => { if (p) setProfile(p) }).catch(() => {})
   }, [])
 
-  const openProfileEditor = () => {
+  // Editor por campo (filas independientes, como Android)
+  const openFieldEditor = (field) => {
     setPFullName(profile?.fullName ?? '')
     setPGender(profile?.gender ?? '')
     setPBirthDate(profile?.birthDate ? new Date(profile.birthDate).toISOString().slice(0, 10) : '')
-    setPBirthVisible(profile?.birthDateVisible ?? false)
     setPInstagram(profile?.instagram ?? '')
-    setEditingProfile(true)
+    setEditingProfile(field) // 'fullName' | 'birthDate' | 'instagram' | 'gender'
   }
 
-  const handleSaveProfile = async () => {
+  const handleSaveField = async () => {
     setPSaving(true)
     try {
-      const birthTs = pBirthDate ? new Date(pBirthDate + 'T00:00:00').getTime() : undefined
-      await saveProfileFields({
-        fullName: pFullName.trim(),
-        gender: pGender || undefined,
-        birthDate: birthTs,
-        birthDateVisible: pBirthVisible,
-        instagram: pInstagram,
-      })
-      setProfile(p => ({
-        ...p, fullName: pFullName.trim(), gender: pGender || p?.gender,
-        birthDate: birthTs ?? p?.birthDate, birthDateVisible: pBirthVisible,
-        instagram: pInstagram.replace(/^@/, '').trim() || null,
-      }))
+      const field = editingProfile
+      const patch = {}
+      const local = {}
+      if (field === 'fullName') { patch.fullName = pFullName.trim(); local.fullName = pFullName.trim() }
+      if (field === 'instagram') { patch.instagram = pInstagram; local.instagram = pInstagram.replace(/^@/, '').trim() || null }
+      if (field === 'gender') { patch.gender = pGender || undefined; local.gender = pGender || profile?.gender }
+      if (field === 'birthDate') {
+        const ts = pBirthDate ? new Date(pBirthDate + 'T00:00:00').getTime() : undefined
+        patch.birthDate = ts
+        patch.birthDateVisible = profile?.birthDateVisible ?? false
+        local.birthDate = ts ?? profile?.birthDate
+      }
+      await saveProfileFields(patch)
+      setProfile(p => ({ ...p, ...local }))
       setEditingProfile(false)
       showToast('Perfil actualizado')
     } catch (e) { showToast('Error: ' + e.message) }
@@ -152,108 +153,166 @@ export default function SettingsPage() {
 
       <div className={styles.content}>
 
-        {/* ── CUENTA ──────────────────────────────────────────── */}
+        {/* ── CUENTA (como activity_settings.xml) ─────────────── */}
         <p className={styles.sectionLabel}>CUENTA</p>
         <div className={styles.card}>
 
-          {/* Foto de perfil */}
-          <button className={styles.rowBtn} onClick={() => photoInputRef.current?.click()}>
-            <div className={styles.avatarSmall}>
+          {/* Cabecera: avatar (clic = cambiar foto) + nombre/@usuario (clic = mi perfil) */}
+          <button className={styles.rowBtn} style={{ padding: '18px 20px' }}
+            onClick={() => user?.uid && navigate(`/user/${user.uid}`)}>
+            <div className={styles.avatarSmall} style={{ width: 60, height: 60, fontSize: 24 }}
+              onClick={e => { e.stopPropagation(); photoInputRef.current?.click() }}
+              title="Cambiar foto de perfil">
               {profile?.photoUrl
                 ? <img src={profile.photoUrl} alt="foto" className={styles.avatarImg} />
                 : avatarLetter
               }
             </div>
-            <div className={styles.rowTextCol}>
-              <span className={styles.rowSublabel}>Foto de perfil</span>
-              <span className={styles.rowBoldValue}>{profile?.photoUrl ? 'Cambiar foto' : 'Añadir foto'}</span>
+            <div className={styles.rowTextCol} style={{ marginLeft: 6 }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {profile?.fullName || displayName || '—'}
+              </span>
+              <span style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 2 }}>
+                @{displayName || '—'}
+              </span>
             </div>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
-              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-            </svg>
           </button>
           <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={handlePickProfilePhoto} />
 
           <div className={styles.divider} />
 
-          {/* Username row */}
-          <button className={styles.rowBtn} onClick={() => { setNewUsername(username ?? ''); setEditingUsername(true); setUsernameError('') }}>
-            <div className={styles.iconCircleGreen}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-            </div>
-            <div className={styles.rowTextCol}>
-              <span className={styles.rowSublabel}>Nombre de usuario</span>
-              <span className={styles.rowBoldValue}>{displayName || '—'}</span>
-            </div>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
-              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-            </svg>
-          </button>
-
-          <div className={styles.divider} />
-
-          {/* Perfil público */}
-          <button className={styles.rowBtn} onClick={openProfileEditor}>
-            <div className={styles.iconCircleGreen}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            </div>
-            <div className={styles.rowTextCol}>
-              <span className={styles.rowSublabel}>Perfil público</span>
-              <span className={styles.rowBoldValue}>{profile?.fullName || 'Completar perfil'}</span>
-            </div>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
-              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-            </svg>
-          </button>
-
-          <div className={styles.divider} />
-
-          {/* Cuenta / proveedores */}
-          {linkedProviders().includes('google.com') ? (
-            <div className={styles.row}>
-              <div className={styles.iconCircleGreen}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-              </div>
-              <div className={styles.rowTextCol}>
-                <span className={styles.rowMain}>Cuenta de Google vinculada</span>
-                <span className={styles.rowSub}>{user?.email ?? ''}</span>
-              </div>
-            </div>
-          ) : (
-            <button className={styles.rowBtn} onClick={async () => {
-              try {
-                await linkGoogleAccount()
-                showToast('Cuenta de Google vinculada')
-              } catch (e) {
-                showToast(e.code === 'auth/credential-already-in-use'
-                  ? 'Esa cuenta de Google ya está en uso'
-                  : 'No se pudo vincular: ' + e.message)
-              }
-            }}>
-              <div className={styles.iconCircleGreen}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-              </div>
-              <div className={styles.rowTextCol}>
-                <span className={styles.rowMain}>Vincular cuenta de Google</span>
-                <span className={styles.rowSub}>{user?.email ?? ''} (correo y contraseña)</span>
-              </div>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
-                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+          {/* Estado de Google (icono Google + texto, como Android) */}
+          {(() => {
+            const googleLinked = linkedProviders().includes('google.com')
+            const GoogleIcon = (
+              <svg viewBox="0 0 24 24" width="22" height="22" style={{ flexShrink: 0 }}>
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
-            </button>
-          )}
+            )
+            return googleLinked ? (
+              <div className={styles.row}>
+                {GoogleIcon}
+                <span style={{ fontSize: 14, color: 'var(--text-primary)', marginLeft: 14 }}>
+                  Cuenta de Google vinculada · {user?.email ?? ''}
+                </span>
+              </div>
+            ) : (
+              <button className={styles.rowBtn} onClick={async () => {
+                try {
+                  await linkGoogleAccount()
+                  showToast('Cuenta de Google vinculada')
+                } catch (e) {
+                  showToast(e.code === 'auth/credential-already-in-use'
+                    ? 'Esa cuenta de Google ya está en uso'
+                    : 'No se pudo vincular: ' + e.message)
+                }
+              }}>
+                {GoogleIcon}
+                <span style={{ fontSize: 14, color: 'var(--text-primary)', marginLeft: 14, flex: 1, textAlign: 'left' }}>
+                  Vincula tu cuenta de Google
+                </span>
+              </button>
+            )
+          })()}
 
           <div className={styles.divider} />
 
-          {/* Sign out */}
+          {/* Cerrar sesión — icono logout rojo, como Android */}
           <button className={styles.rowBtn} onClick={handleSignOut} disabled={signingOut}>
-            <div className={styles.iconTriangleRed}>
-              {signingOut
-                ? <span className="spinner" style={{ width: 16, height: 16 }} />
-                : <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-              }
+            {signingOut
+              ? <span className="spinner" style={{ width: 20, height: 20, flexShrink: 0 }} />
+              : <svg viewBox="0 0 24 24" width="22" height="22" fill="#EF5350" style={{ flexShrink: 0 }}>
+                  <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+                </svg>
+            }
+            <span style={{ fontSize: 15, color: '#EF5350', marginLeft: 16 }}>
+              {signingOut ? 'Cerrando sesión…' : 'Cerrar sesión'}
+            </span>
+          </button>
+        </div>
+
+        {/* ── PERFIL (filas editables como Android) ───────────── */}
+        <p className={styles.sectionLabel}>PERFIL</p>
+        <div className={styles.card}>
+
+          {[
+            { id: 'fullName', label: 'Nombre completo', value: profile?.fullName || '—' },
+            { id: 'username', label: 'Nombre de usuario', value: displayName || '—' },
+          ].map(row => (
+            <div key={row.id}>
+              <button className={styles.rowBtn} onClick={() => {
+                if (row.id === 'username') { setNewUsername(username ?? ''); setEditingUsername(true); setUsernameError('') }
+                else openFieldEditor(row.id)
+              }}>
+                <div className={styles.rowTextCol} style={{ flex: 1 }}>
+                  <span className={styles.rowSublabel}>{row.label}</span>
+                  <span className={styles.rowBoldValue}>{row.value}</span>
+                </div>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+                  <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                </svg>
+              </button>
+              <div className={styles.divider} />
             </div>
-            <span className={styles.rowDanger}>{signingOut ? 'Cerrando sesión…' : 'Cerrar sesión de Google'}</span>
+          ))}
+
+          {/* Fecha de nacimiento + switch de visibilidad */}
+          <div className={styles.row} style={{ paddingRight: 20 }}>
+            <button className={styles.rowBtn} style={{ flex: 1, padding: '14px 12px 14px 20px' }}
+              onClick={() => openFieldEditor('birthDate')}>
+              <div className={styles.rowTextCol} style={{ flex: 1 }}>
+                <span className={styles.rowSublabel}>Fecha de nacimiento</span>
+                <span className={styles.rowBoldValue}>
+                  {profile?.birthDate
+                    ? new Date(profile.birthDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : '—'}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Mostrar en mi perfil</span>
+              </div>
+            </button>
+            <button
+              className={`${styles.toggle} ${profile?.birthDateVisible ? styles.toggleOn : ''}`}
+              onClick={async () => {
+                const v = !profile?.birthDateVisible
+                setProfile(p => ({ ...p, birthDateVisible: v }))
+                await saveProfileFields({ birthDate: profile?.birthDate ?? 0, birthDateVisible: v }).catch(() => {})
+              }}>
+              <div className={styles.toggleThumb} />
+            </button>
+          </div>
+
+          <div className={styles.divider} />
+
+          {/* Instagram */}
+          <button className={styles.rowBtn} onClick={() => openFieldEditor('instagram')}>
+            <div className={styles.rowTextCol} style={{ flex: 1 }}>
+              <span className={styles.rowSublabel} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 3.25.15 4.77 1.69 4.92 4.92.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.15 3.23-1.66 4.77-4.92 4.92-1.27.06-1.64.07-4.85.07s-3.58-.01-4.85-.07c-3.26-.15-4.77-1.7-4.92-4.92C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85C2.38 3.92 3.9 2.38 7.15 2.23 8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 2.7.27.27 2.69.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.2 4.36 2.62 6.78 6.98 6.98C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c4.35-.2 6.78-2.62 6.98-6.98.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95C23.78 2.7 21.35.27 17 .07 15.67.01 15.26 0 12 0zm0 5.84A6.16 6.16 0 1 0 18.16 12 6.16 6.16 0 0 0 12 5.84zM12 16a4 4 0 1 1 4-4 4 4 0 0 1-4 4zm6.4-11.85a1.44 1.44 0 1 0 1.44 1.44 1.44 1.44 0 0 0-1.44-1.44z"/></svg>
+                Instagram
+              </span>
+              <span className={styles.rowBoldValue}>{profile?.instagram || '—'}</span>
+            </div>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+            </svg>
+          </button>
+
+          <div className={styles.divider} />
+
+          {/* Género */}
+          <button className={styles.rowBtn} onClick={() => openFieldEditor('gender')}>
+            <div className={styles.rowTextCol} style={{ flex: 1 }}>
+              <span className={styles.rowSublabel}>Género</span>
+              <span className={styles.rowBoldValue}>
+                {{ male: 'Hombre', female: 'Mujer', other: 'Otro', na: 'Prefiero no decirlo' }[profile?.gender] ?? '—'}
+              </span>
+            </div>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+            </svg>
           </button>
         </div>
 
@@ -289,29 +348,18 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* ── SINCRONIZACIÓN ──────────────────────────────────── */}
-        <p className={styles.sectionLabel}>SINCRONIZACIÓN</p>
-        <div className={styles.card}>
-          <div className={styles.row}>
-            <div className={styles.themeIcon} style={{ color: 'var(--text-secondary)' }}>
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-            </div>
-            <div className={styles.rowTextCol} style={{ flex: 1 }}>
-              <span className={styles.rowMain}>Ocultar notificación de sincronización</span>
-              <span className={styles.rowSub}>La sincronización continúa en segundo plano</span>
-            </div>
-            {/* Toggle */}
-            <button
-              className={`${styles.toggle} ${hideSyncNotif ? styles.toggleOn : ''}`}
-              onClick={() => setHideSyncNotif(v => !v)}
-            >
-              <div className={styles.toggleThumb} />
-            </button>
-          </div>
-        </div>
-
         {/* ── HISTORIAL DE CAMBIOS ─────────────────────────────── */}
-        <p className={styles.sectionLabel}>HISTORIAL DE CAMBIOS</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <p className={styles.sectionLabel} style={{ flex: 1 }}>HISTORIAL DE CAMBIOS</p>
+          {history?.length > 0 && (
+            <button
+              onClick={() => { if (confirm('¿Borrar todo el historial?')) clearHistory() }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8,
+                fontSize: 13, color: '#EF5350', fontFamily: 'inherit' }}>
+              Borrar todo
+            </button>
+          )}
+        </div>
         {(!history || history.length === 0) ? (
           <p className={styles.emptyHistory}>No hay cambios registrados</p>
         ) : (
@@ -332,9 +380,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
-            <button className={styles.clearHistoryBtn} onClick={() => { if (confirm('¿Borrar todo el historial?')) clearHistory() }}>
-              Borrar historial
-            </button>
           </div>
         )}
 
@@ -379,42 +424,63 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ── Profile editor dialog ──────────────────────────────── */}
+      {/* ── Editor de un campo del perfil (como los diálogos de Android) ── */}
       {editingProfile && (
         <div className="dialog-backdrop" onClick={() => setEditingProfile(false)}>
-          <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxHeight: '85dvh', overflowY: 'auto' }}>
-            <h3>Perfil público</h3>
+          <div className="dialog" onClick={e => e.stopPropagation()}>
+            <h3>{{
+              fullName: 'Nombre completo',
+              birthDate: 'Fecha de nacimiento',
+              instagram: 'Instagram',
+              gender: 'Género',
+            }[editingProfile]}</h3>
 
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Nombre completo</p>
-            <input className="input-field" value={pFullName} maxLength={50}
-              placeholder="Nombre y apellidos"
-              onChange={e => setPFullName(e.target.value)} />
+            {editingProfile === 'fullName' && (
+              <input className="input-field" value={pFullName} maxLength={50} autoFocus
+                placeholder="Nombre y apellidos"
+                onChange={e => setPFullName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
+            )}
 
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Género</p>
-            <select className="input-field" value={pGender} onChange={e => setPGender(e.target.value)}>
-              <option value="">—</option>
-              <option value="male">Hombre</option>
-              <option value="female">Mujer</option>
-              <option value="other">Otro</option>
-              <option value="na">Prefiero no decirlo</option>
-            </select>
+            {editingProfile === 'birthDate' && (
+              <input className="input-field" type="date" value={pBirthDate} autoFocus
+                onChange={e => setPBirthDate(e.target.value)} />
+            )}
 
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Fecha de nacimiento</p>
-            <input className="input-field" type="date" value={pBirthDate}
-              onChange={e => setPBirthDate(e.target.value)} />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-primary)', margin: '8px 0' }}>
-              <input type="checkbox" checked={pBirthVisible} onChange={e => setPBirthVisible(e.target.checked)} />
-              Mostrarla en mi perfil
-            </label>
+            {editingProfile === 'instagram' && (
+              <input className="input-field" value={pInstagram} maxLength={30} autoFocus
+                placeholder="@tu_instagram"
+                onChange={e => setPInstagram(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSaveField()} />
+            )}
 
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Instagram</p>
-            <input className="input-field" value={pInstagram} maxLength={30}
-              placeholder="@tu_instagram"
-              onChange={e => setPInstagram(e.target.value)} />
+            {editingProfile === 'gender' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[
+                  { id: 'male', label: 'Hombre' },
+                  { id: 'female', label: 'Mujer' },
+                  { id: 'other', label: 'Otro' },
+                  { id: 'na', label: 'Prefiero no decirlo' },
+                ].map(g => (
+                  <button key={g.id}
+                    onClick={() => setPGender(g.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                      borderRadius: 12, cursor: 'pointer', fontSize: 15, fontFamily: 'inherit',
+                      color: 'var(--text-primary)', textAlign: 'left',
+                      border: '1.5px solid ' + (pGender === g.id ? 'var(--text-primary)' : 'var(--card-stroke)'),
+                      background: pGender === g.id ? 'var(--log-card-bg)' : 'transparent' }}>
+                    <div className={`${styles.radio} ${pGender === g.id ? styles.radioOn : ''}`}>
+                      {pGender === g.id && <div className={styles.radioDot} />}
+                    </div>
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
               <button className="btn-ghost" onClick={() => setEditingProfile(false)}>Cancelar</button>
-              <button className="btn-primary" onClick={handleSaveProfile} disabled={pSaving}>
+              <button className="btn-primary" onClick={handleSaveField} disabled={pSaving}>
                 {pSaving ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 'Guardar'}
               </button>
             </div>

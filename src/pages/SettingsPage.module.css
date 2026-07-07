@@ -30,9 +30,9 @@
 
 /* ── Card ───────────────────────────────────────────────────────────────────── */
 .card {
+  /* Como las MaterialCardView de Ajustes en Android: card_background, radio 20, sin borde */
   background: var(--card-bg);
-  border: 1px solid var(--card-stroke);
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
   flex-shrink: 0;
 }

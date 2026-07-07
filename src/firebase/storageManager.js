@@ -22,15 +22,3 @@ export async function deleteBackground(path) {
     // Not found — ignorar
   }
 }
-
-export async function downloadBackgroundUrl(url) {
-  // Para imágenes de Firebase Storage, la URL ya es pública/firmada.
-  // Las descargamos como blob para mostrarlas localmente.
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    return URL.createObjectURL(await res.blob())
-  } catch {
-    return null
-  }
-}

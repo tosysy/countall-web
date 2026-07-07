@@ -65,7 +65,12 @@ export async function uploadBackground(counterId, blob) {
   } catch { return false }
 }
 
-/** Devuelve { counterId: blobUrl } con todos los fondos personales, o null si falla el listado. */
+/**
+ * Devuelve { counterId: downloadUrl } con todos los fondos personales, o null
+ * si falla el listado. Se devuelve la URL de descarga directamente (para CSS/
+ * <img>, que no están sujetos a CORS): hacer fetch() de alt=media está
+ * bloqueado por CORS en los buckets *.firebasestorage.app.
+ */
 export async function downloadAllBackgrounds() {
   const me = uid(); if (!me) return null
   try {
@@ -76,10 +81,8 @@ export async function downloadAllBackgrounds() {
       if (!name.startsWith('bg_') || !name.endsWith('.jpg')) continue
       const counterId = name.slice(3, -4)
       try {
-        const url = await getDownloadURL(item)
-        const res = await fetch(url)
-        if (res.ok) result[counterId] = URL.createObjectURL(await res.blob())
-      } catch { /* existe pero no se pudo descargar — no borrar en local */ }
+        result[counterId] = await getDownloadURL(item)
+      } catch { /* existe pero no se pudo resolver la URL — no borrar en local */ }
     }
     return result
   } catch { return null }

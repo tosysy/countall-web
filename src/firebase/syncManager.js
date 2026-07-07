@@ -13,7 +13,7 @@ import {
 } from './personalBackup'
 import {
   sharedCounterPath, folderPath, uploadBackground as storageUpload,
-  deleteBackground as storageDelete, downloadBackgroundUrl,
+  deleteBackground as storageDelete,
 } from './storageManager'
 import { syncPublicCounters } from './profileManager'
 import { getDeviceId } from './deviceId'

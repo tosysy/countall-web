@@ -580,6 +580,27 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                 </>
               )}
 
+              {/* ── PERFIL ── */}
+              {isOwner && (
+                <>
+                  <p className={styles.settingSection}>PERFIL</p>
+                  <div className={styles.settingCard}>
+                    <div className={styles.settingCardRow}>
+                      <div className={styles.settingCardIcon}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                      </div>
+                      <span className={styles.settingCardLabel}>Mostrar en mi perfil</span>
+                      <button
+                        className={`${styles.settingToggle} ${counter.showOnProfile ? styles.settingToggleOn : ''}`}
+                        onClick={() => onUpdate({ showOnProfile: !counter.showOnProfile })}
+                      >
+                        <div className={styles.settingToggleThumb} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* ── MODO (solo owner compartido) ── */}
               {counter.isShared && isOwner && (
                 <>

@@ -15,6 +15,7 @@ import {
   sharedCounterPath, folderPath, uploadBackground as storageUpload,
   deleteBackground as storageDelete, downloadBackgroundUrl,
 } from './storageManager'
+import { syncPublicCounters } from './profileManager'
 import { getDeviceId } from './deviceId'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -566,6 +567,9 @@ export async function pushPersonalData(counters, folders, gridOrder, folderOrder
 
   const ok = await uploadSyncBundle(bundle)
   if (ok) await set(ref(db, `users/${me}/dataVersion`), version)
+
+  // Mantener actualizados los contadores públicos del perfil (como Android)
+  syncPublicCounters(counters, folders).catch(() => {})
 }
 
 /** Lee el bundle personal desde RTDB (con fallback a Storage, igual que Android). */

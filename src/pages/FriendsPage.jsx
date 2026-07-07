@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getFriends, sendFriendRequest, acceptFriendRequest, removeFriend, searchUsers, listenFriendRequests } from '../firebase/syncManager'
+import { getProfilesLite } from '../firebase/profileManager'
 import useAppStore from '../store/appStore'
 import styles from './FriendsPage.module.css'
 
@@ -33,8 +34,14 @@ export default function FriendsPage() {
 
   const loadFriends = async () => {
     const list = await getFriends()
-    setFriends(list.filter(f => f.status === 'accepted'))
+    const accepted = list.filter(f => f.status === 'accepted')
+    setFriends(accepted)
     setPendingSent(list.filter(f => f.status === 'pending' && f.direction === 'sent').map(f => ({ uid: f.uid, username: f.username })))
+    // Enriquecer con foto y nombre completo desde publicProfiles (como Android)
+    if (accepted.length) {
+      const profiles = await getProfilesLite(accepted.map(f => f.uid)).catch(() => ({}))
+      setFriends(cur => cur.map(f => profiles[f.uid] ? { ...f, ...profiles[f.uid], username: f.username } : f))
+    }
   }
 
   const handleSearchChange = (e) => {
@@ -186,6 +193,7 @@ export default function FriendsPage() {
               if (isSelf) return null
               return <UserCard key={f.uid} user={f} state={state}
                 isDismissing={dismissingId === f.uid}
+                onOpen={() => navigate(`/user/${f.uid}`)}
                 onAdd={() => handleSendRequest(f.uid, f.username)}
                 onCancel={() => dismissThen(f.uid, () => handleCancelRequest(f.uid))}
                 onRemove={() => dismissThen(f.uid, () => handleRemove(f.uid))} />
@@ -217,6 +225,7 @@ export default function FriendsPage() {
             : received.map(f => (
                 <UserCard key={f.uid} user={f} state="received"
                   isDismissing={dismissingId === f.uid}
+                  onOpen={() => navigate(`/user/${f.uid}`)}
                   onAccept={() => handleAccept(f)}
                   onReject={() => dismissThen(f.uid, () => handleReject(f))} />
               ))
@@ -227,7 +236,7 @@ export default function FriendsPage() {
   )
 }
 
-function UserCard({ user: f, state, isDismissing, onAdd, onCancel, onRemove, onAccept, onReject }) {
+function UserCard({ user: f, state, isDismissing, onOpen, onAdd, onCancel, onRemove, onAccept, onReject }) {
   const color = (() => {
     const COLORS = ['#5C6BC0','#26A69A','#66BB6A','#EC407A','#FFA726','#42A5F5','#8D6E63','#78909C']
     let h = 0; for (const c of (f.username ?? '')) h = (h * 31 + c.charCodeAt(0)) >>> 0
@@ -239,12 +248,17 @@ function UserCard({ user: f, state, isDismissing, onAdd, onCancel, onRemove, onA
   return (
     <div className={isDismissing ? styles.collapseWrap : undefined}>
       <div className={`${styles.userCard} ${isDismissing ? styles.userCardDismissing : ''}`}>
-        <div className={styles.avatar} style={{ background: color }}>
-          {f.username?.[0]?.toUpperCase() ?? '?'}
+        <div className={styles.avatar}
+          style={{ background: f.photoUrl ? 'transparent' : color, cursor: onOpen ? 'pointer' : undefined, overflow: 'hidden' }}
+          onClick={onOpen}>
+          {f.photoUrl
+            ? <img src={f.photoUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            : (f.username?.[0]?.toUpperCase() ?? '?')}
         </div>
-        <div className={styles.userInfo}>
+        <div className={styles.userInfo} onClick={onOpen} style={onOpen ? { cursor:'pointer' } : undefined}>
           <span className={styles.userName}>{f.username}</span>
-          {stateLabel && <span className={styles.userSub}>{stateLabel}</span>}
+          {f.fullName ? <span className={styles.userSub}>{f.fullName}</span>
+            : stateLabel && <span className={styles.userSub}>{stateLabel}</span>}
         </div>
         <div className={styles.userActions}>
           {state === 'none'     && <button className={styles.btnAdd}    onClick={onAdd}>Añadir</button>}

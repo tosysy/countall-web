@@ -18,6 +18,8 @@ import MainPage from './pages/MainPage'
 import FriendsPage from './pages/FriendsPage'
 import InvitationsPage from './pages/InvitationsPage'
 import SettingsPage from './pages/SettingsPage'
+import OnboardingPage from './pages/OnboardingPage'
+import UserProfilePage from './pages/UserProfilePage'
 
 function OfflineBanner() {
   const [offline, setOffline] = useState(!navigator.onLine)
@@ -335,10 +337,15 @@ export default function App() {
       const fbUsername = await getUsername(user.uid)
       if (fbUsername) setUsername(fbUsername)
 
-      // Navegar a main, pasando código de invitación pendiente si lo hay
+      // Navegar a main, pasando código de invitación pendiente si lo hay.
+      // Sin username → onboarding de perfil (igual que Android tras el registro).
       const pending = pendingCodeRef.current
       pendingCodeRef.current = null
-      navigate('/', { replace: true, state: pending ? { pendingCode: pending } : undefined })
+      if (!fbUsername) {
+        navigate('/onboarding', { replace: true })
+      } else {
+        navigate('/', { replace: true, state: pending ? { pendingCode: pending } : undefined })
+      }
 
       // La sincronización personal ya no depende de Drive: el bundle vive en
       // RTDB users/{uid}/syncBundle (mismo canal que Android). El token de
@@ -482,7 +489,9 @@ export default function App() {
             initPersonalSync(t)
           }} />} />
           <Route path="/" element={<MainPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/friends" element={<FriendsPage />} />
+          <Route path="/user/:uid" element={<UserProfilePage />} />
           <Route path="/invitations" element={<InvitationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

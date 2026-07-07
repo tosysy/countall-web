@@ -5,6 +5,8 @@ import { auth } from '../firebase/config'
 import { isUsernameAvailable, setUsername, signOut as firebaseSignOut } from '../firebase/auth'
 import { deleteAccount } from '../firebase/syncManager'
 import { unregisterFcmToken } from '../firebase/messagingManager'
+import { getOwnProfile, saveProfileFields, uploadProfilePhoto } from '../firebase/profileManager'
+import { useEffect, useRef } from 'react'
 import useAppStore from '../store/appStore'
 import styles from './SettingsPage.module.css'
 
@@ -22,6 +24,62 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [hideSyncNotif, setHideSyncNotif] = useState(false)
+
+  // ── Perfil público (foto, nombre, género, fecha, Instagram) ──────────────
+  const [profile, setProfile] = useState(null)
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [pFullName, setPFullName] = useState('')
+  const [pGender, setPGender] = useState('')
+  const [pBirthDate, setPBirthDate] = useState('') // yyyy-mm-dd para <input type=date>
+  const [pBirthVisible, setPBirthVisible] = useState(false)
+  const [pInstagram, setPInstagram] = useState('')
+  const [pSaving, setPSaving] = useState(false)
+  const photoInputRef = useRef(null)
+
+  useEffect(() => {
+    getOwnProfile().then(p => { if (p) setProfile(p) }).catch(() => {})
+  }, [])
+
+  const openProfileEditor = () => {
+    setPFullName(profile?.fullName ?? '')
+    setPGender(profile?.gender ?? '')
+    setPBirthDate(profile?.birthDate ? new Date(profile.birthDate).toISOString().slice(0, 10) : '')
+    setPBirthVisible(profile?.birthDateVisible ?? false)
+    setPInstagram(profile?.instagram ?? '')
+    setEditingProfile(true)
+  }
+
+  const handleSaveProfile = async () => {
+    setPSaving(true)
+    try {
+      const birthTs = pBirthDate ? new Date(pBirthDate + 'T00:00:00').getTime() : undefined
+      await saveProfileFields({
+        fullName: pFullName.trim(),
+        gender: pGender || undefined,
+        birthDate: birthTs,
+        birthDateVisible: pBirthVisible,
+        instagram: pInstagram,
+      })
+      setProfile(p => ({
+        ...p, fullName: pFullName.trim(), gender: pGender || p?.gender,
+        birthDate: birthTs ?? p?.birthDate, birthDateVisible: pBirthVisible,
+        instagram: pInstagram.replace(/^@/, '').trim() || null,
+      }))
+      setEditingProfile(false)
+      showToast('Perfil actualizado')
+    } catch (e) { showToast('Error: ' + e.message) }
+    finally { setPSaving(false) }
+  }
+
+  const handlePickProfilePhoto = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const url = await uploadProfilePhoto(file)
+      setProfile(p => ({ ...p, photoUrl: url }))
+      showToast('Foto actualizada')
+    } catch (err) { showToast('Error al subir la foto: ' + err.message) }
+  }
 
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(null), 3000) }
 
@@ -98,17 +156,50 @@ export default function SettingsPage() {
         <p className={styles.sectionLabel}>CUENTA</p>
         <div className={styles.card}>
 
-          {/* Username row */}
-          <button className={styles.rowBtn} onClick={() => { setNewUsername(username ?? ''); setEditingUsername(true); setUsernameError('') }}>
+          {/* Foto de perfil */}
+          <button className={styles.rowBtn} onClick={() => photoInputRef.current?.click()}>
             <div className={styles.avatarSmall}>
-              {user?.photoURL
-                ? <img src={user.photoURL} alt="foto" className={styles.avatarImg} referrerPolicy="no-referrer" />
+              {profile?.photoUrl
+                ? <img src={profile.photoUrl} alt="foto" className={styles.avatarImg} />
                 : avatarLetter
               }
             </div>
             <div className={styles.rowTextCol}>
+              <span className={styles.rowSublabel}>Foto de perfil</span>
+              <span className={styles.rowBoldValue}>{profile?.photoUrl ? 'Cambiar foto' : 'Añadir foto'}</span>
+            </div>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+            </svg>
+          </button>
+          <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={handlePickProfilePhoto} />
+
+          <div className={styles.divider} />
+
+          {/* Username row */}
+          <button className={styles.rowBtn} onClick={() => { setNewUsername(username ?? ''); setEditingUsername(true); setUsernameError('') }}>
+            <div className={styles.iconCircleGreen}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <div className={styles.rowTextCol}>
               <span className={styles.rowSublabel}>Nombre de usuario</span>
               <span className={styles.rowBoldValue}>{displayName || '—'}</span>
+            </div>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
+              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+            </svg>
+          </button>
+
+          <div className={styles.divider} />
+
+          {/* Perfil público */}
+          <button className={styles.rowBtn} onClick={openProfileEditor}>
+            <div className={styles.iconCircleGreen}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </div>
+            <div className={styles.rowTextCol}>
+              <span className={styles.rowSublabel}>Perfil público</span>
+              <span className={styles.rowBoldValue}>{profile?.fullName || 'Completar perfil'}</span>
             </div>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
               <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
@@ -258,6 +349,49 @@ export default function SettingsPage() {
               <button className="btn-ghost" onClick={() => setEditingUsername(false)}>Cancelar</button>
               <button className="btn-primary" onClick={handleSaveUsername} disabled={usernameLoading}>
                 {usernameLoading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Profile editor dialog ──────────────────────────────── */}
+      {editingProfile && (
+        <div className="dialog-backdrop" onClick={() => setEditingProfile(false)}>
+          <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxHeight: '85dvh', overflowY: 'auto' }}>
+            <h3>Perfil público</h3>
+
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Nombre completo</p>
+            <input className="input-field" value={pFullName} maxLength={50}
+              placeholder="Nombre y apellidos"
+              onChange={e => setPFullName(e.target.value)} />
+
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Género</p>
+            <select className="input-field" value={pGender} onChange={e => setPGender(e.target.value)}>
+              <option value="">—</option>
+              <option value="male">Hombre</option>
+              <option value="female">Mujer</option>
+              <option value="other">Otro</option>
+              <option value="na">Prefiero no decirlo</option>
+            </select>
+
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Fecha de nacimiento</p>
+            <input className="input-field" type="date" value={pBirthDate}
+              onChange={e => setPBirthDate(e.target.value)} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-primary)', margin: '8px 0' }}>
+              <input type="checkbox" checked={pBirthVisible} onChange={e => setPBirthVisible(e.target.checked)} />
+              Mostrarla en mi perfil
+            </label>
+
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', margin: '10px 0 4px' }}>Instagram</p>
+            <input className="input-field" value={pInstagram} maxLength={30}
+              placeholder="@tu_instagram"
+              onChange={e => setPInstagram(e.target.value)} />
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+              <button className="btn-ghost" onClick={() => setEditingProfile(false)}>Cancelar</button>
+              <button className="btn-primary" onClick={handleSaveProfile} disabled={pSaving}>
+                {pSaving ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 'Guardar'}
               </button>
             </div>
           </div>

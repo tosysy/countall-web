@@ -1090,6 +1090,19 @@ export default function MainPage() {
               )}
             </div>
 
+            {/* Mostrar en mi perfil (carpeta y su contenido) */}
+            {editingFolder.role === 'owner' && (
+              <label style={{ display:'flex', alignItems:'center', gap:10, marginTop:10, fontSize:13, color:'var(--text-primary)', cursor:'pointer' }}>
+                <input type="checkbox" checked={!!editingFolder.showOnProfile}
+                  onChange={e => {
+                    updateFolder(editingFolder.id, { showOnProfile: e.target.checked })
+                    setEditingFolder(f => ({ ...f, showOnProfile: e.target.checked }))
+                    push()
+                  }} />
+                Mostrar en mi perfil (incluye su contenido)
+              </label>
+            )}
+
             {/* Compartir / Código */}
             <div style={{ borderTop:'1px solid var(--card-stroke)', marginTop:12, paddingTop:12, display:'flex', flexDirection:'column', gap:8 }}>
               {!editingFolder.isShared && editingFolder.role === 'owner' && (

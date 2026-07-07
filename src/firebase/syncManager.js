@@ -527,6 +527,7 @@ export function listenFriendRequests(onUpdate) {
       requests.push({
         uid: c.key, username: c.child('username').val() ?? '',
         status: 'pending', direction: 'received',
+        addedAt: c.child('addedAt').val() ?? 0,
       })
     })
     onUpdate(requests)

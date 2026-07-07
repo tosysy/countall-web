@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { getProfilesLite } from '../firebase/profileManager'
 import {
   listenInvitations, listenSentInvitations,
   acceptInvitation, acceptFolderInvitation, rejectInvitation,
@@ -10,10 +11,28 @@ import {
 import useAppStore from '../store/appStore'
 import styles from './InvitationsPage.module.css'
 
+// Hora relativa como Android ("hace un momento", "hace 5 min", …)
+function relativeTime(time) {
+  if (!time) return ''
+  const diff = Date.now() - time
+  if (diff < 60000) return 'hace un momento'
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `hace ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `hace ${hours} h`
+  return `hace ${Math.floor(hours / 24)} d`
+}
+
+const AVATAR_COLORS = ['#5C6BC0','#26A69A','#66BB6A','#EC407A','#FFA726','#42A5F5','#8D6E63','#78909C']
+function avatarColor(name = '') {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]
+}
+
 export default function InvitationsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, counters, folders, addCounter, addFolder, updateCounter, updateFolder, driveToken } = useAppStore()
-  const [tab, setTab] = useState('received')
   const [received, setReceived] = useState([])
   const [sent, setSent] = useState([])
   const [loading, setLoading] = useState(null)
@@ -25,6 +44,28 @@ export default function InvitationsPage() {
   const [friendSuggestions, setFriendSuggestions] = useState([])
   const [friendReceived, setFriendReceived] = useState([]) // solicitudes de amistad recibidas
   const [friendSent, setFriendSent] = useState([])         // solicitudes de amistad enviadas
+  const [profiles, setProfiles] = useState({})             // uid → {photoUrl, fullName}
+
+  // "Enviar a un amigo" desde el diálogo de compartir → abrir el formulario preseleccionado
+  useEffect(() => {
+    const item = location.state?.sendItem
+    if (!item) return
+    navigate('/invitations', { replace: true, state: {} })
+    setSendForm(f => ({ ...f, itemId: item.itemId, sharedId: item.sharedId ?? null, itemName: item.itemName, isFolder: item.isFolder ?? false }))
+    setShowSend(true)
+  }, []) // eslint-disable-line
+
+  // Fotos de perfil de todos los implicados (como Android)
+  useEffect(() => {
+    const uids = new Set()
+    friendReceived.forEach(f => uids.add(f.uid))
+    friendSent.forEach(f => uids.add(f.uid))
+    received.forEach(i => i.fromUid && uids.add(i.fromUid))
+    sent.forEach(i => i.toUid && uids.add(i.toUid))
+    const missing = [...uids].filter(u => !(u in profiles))
+    if (missing.length === 0) return
+    getProfilesLite(missing).then(p => setProfiles(prev => ({ ...prev, ...p }))).catch(() => {})
+  }, [friendReceived, friendSent, received, sent]) // eslint-disable-line
 
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(null), 3000) }
 
@@ -179,144 +220,120 @@ export default function InvitationsPage() {
         )}
       </header>
 
-      {/* Tab bar */}
-      <div className={styles.tabs}>
-        <div className={styles.tabIndicator} style={{ transform:`translateX(${tab==='received'?0:100}%)`, width:'50%' }} />
-        {[
-          { id:'received', label:'Recibidas' },
-          { id:'sent',     label:'Enviadas' },
-        ].map(t => (
-          <button key={t.id} className={`${styles.tab} ${tab===t.id?styles.active:''}`} onClick={() => setTab(t.id)}>
-            {t.label}
-            {t.id==='received' && (received.length>0 || friendReceived.length>0) && <span className={styles.tabBadge} />}
-          </button>
-        ))}
-      </div>
 
       {/* Lista */}
       <div className={styles.list}>
 
-        {/* ── RECIBIDAS ── */}
-        {tab === 'received' && (
-          (received.length === 0 && friendReceived.length === 0)
-            ? <div className="empty-state">
+        {/* ── Lista unificada, ordenada por fecha (como Android) ── */}
+        {(() => {
+          const unified = [
+            ...friendReceived.map(f => ({
+              id: 'fr_rcv_' + f.uid, dismissKey: 'fr_' + f.uid, ts: f.addedAt ?? 0,
+              uid: f.uid, username: f.username,
+              message: <>ha enviado una <strong>solicitud de amistad</strong></>,
+              role: null, isSent: false,
+              onAccept: () => handleFriendAccept(f), onReject: () => handleFriendReject(f),
+            })),
+            ...friendSent.map(f => ({
+              id: 'fr_snd_' + f.uid, dismissKey: 'fr_' + f.uid, ts: f.addedAt ?? 0,
+              uid: f.uid, username: f.username,
+              message: <>Has enviado una <strong>solicitud de amistad</strong></>,
+              role: null, isSent: true,
+              onCancel: () => handleFriendCancel(f),
+            })),
+            ...received.map(inv => ({
+              id: 'inv_rcv_' + inv.id, dismissKey: inv.id, ts: inv.createdAt ?? 0,
+              uid: inv.fromUid, username: inv.fromUsername,
+              message: inv.isRequest
+                ? <>solicita permiso de edición en <strong>{inv.itemName}</strong></>
+                : <>te ha invitado a participar en {inv.isFolder ? 'la carpeta ' : ''}<strong>{inv.itemName}</strong></>,
+              role: inv.role === 'editor' ? 'Permisos: Editor (puede modificar)' : 'Permisos: Visor (solo lectura)',
+              isSent: false,
+              onAccept: () => handleAccept(inv), onReject: () => handleReject(inv),
+            })),
+            ...sent.map(inv => ({
+              id: 'inv_snd_' + inv.id, dismissKey: inv.id, ts: inv.createdAt ?? 0,
+              uid: inv.toUid, username: inv.toUsername,
+              message: <>Has enviado una <strong>invitación</strong>{inv.isFolder ? ' a la carpeta ' : ' al contador '}<strong>{inv.itemName}</strong></>,
+              role: inv.role === 'editor' ? 'Permisos: Editor (puede modificar)' : 'Permisos: Visor (solo lectura)',
+              isSent: true,
+              onCancel: () => handleCancel(inv),
+            })),
+          ].sort((a, b) => b.ts - a.ts)
+
+          if (unified.length === 0) {
+            return (
+              <div className="empty-state">
                 <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor">
                   <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
                 </svg>
                 <p>No hay notificaciones</p>
               </div>
-            : <>
-            {friendReceived.map(f => (
-                <div key={'fr_' + f.uid} className={dismissingId === 'fr_' + f.uid ? styles.collapseWrap : undefined}>
-                  <div className={`${styles.card} ${dismissingId === 'fr_' + f.uid ? styles.cardDismissing : ''}`}>
-                    <div className={`${styles.typeIcon} ${styles.typeRequest}`}>
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            )
+          }
+
+          return unified.map(n => {
+            const busy = loading === n.dismissKey || dismissingId === n.dismissKey
+            const photo = n.uid ? profiles[n.uid]?.photoUrl : null
+            return (
+              <div key={n.id} className={dismissingId === n.dismissKey ? styles.collapseWrap : undefined}>
+                <div
+                  className={dismissingId === n.dismissKey ? styles.cardDismissing : undefined}
+                  onClick={() => n.uid && navigate(`/user/${n.uid}`)}
+                  style={{ border: '1px solid var(--card-stroke)', borderRadius: 16, padding: 16,
+                    marginBottom: 12, cursor: n.uid ? 'pointer' : 'default' }}>
+                  {/* Fila superior: avatar + textos */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: photo ? 'transparent' : avatarColor(n.username),
+                      color: '#fff', fontWeight: 700, fontSize: 17 }}>
+                      {photo
+                        ? <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : (n.username?.[0]?.toUpperCase() ?? '?')}
                     </div>
-                    <div className={styles.cardInfo}>
-                      <p className={styles.cardTitle}>{f.username}</p>
-                      <p className={styles.cardSub}>Quiere ser tu amigo</p>
-                    </div>
-                    <div className={styles.cardActions}>
-                      <button className={styles.btnAccept} disabled={loading==='fr_'+f.uid || dismissingId==='fr_'+f.uid} onClick={() => handleFriendAccept(f)}>
-                        {loading==='fr_'+f.uid ? <span className="spinner" style={{width:14,height:14}}/> : 'Aceptar'}
-                      </button>
-                      <button className={styles.btnReject} disabled={loading==='fr_'+f.uid || dismissingId==='fr_'+f.uid} onClick={() => handleFriendReject(f)}>
-                        Rechazar
-                      </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <p style={{ margin: 0, flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.username}</p>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', flexShrink: 0 }}>{relativeTime(n.ts)}</span>
+                      </div>
+                      <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>{n.message}</p>
+                      {n.role && (
+                        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>{n.role}</p>
+                      )}
                     </div>
                   </div>
-                </div>
-              ))}
-            {received.map(inv => (
-                <div key={inv.id} className={dismissingId === inv.id ? styles.collapseWrap : undefined}>
-                  <div className={`${styles.card} ${dismissingId === inv.id ? styles.cardDismissing : ''}`}>
-                    {/* Icono tipo */}
-                    <div className={`${styles.typeIcon} ${inv.isRequest ? styles.typeRequest : inv.isFolder ? styles.typeFolder : styles.typeCounter}`}>
-                      {inv.isRequest
-                        ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-                        : inv.isFolder
-                          ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                          : <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                      }
-                    </div>
-
-                    {/* Info */}
-                    <div className={styles.cardInfo}>
-                      <p className={styles.cardTitle}>{inv.itemName}</p>
-                      {inv.isRequest
-                        ? <p className={styles.cardSub}><strong>{inv.fromUsername}</strong> solicita permiso de edición</p>
-                        : <>
-                            <p className={styles.cardSub}>De <strong>{inv.fromUsername}</strong></p>
-                            <p className={styles.cardMeta}>
-                              {inv.isFolder ? 'Carpeta' : 'Contador'} · {inv.role === 'editor' ? 'Editor' : 'Solo ver'}
-                            </p>
-                          </>
-                      }
-                    </div>
-
-                    {/* Acciones */}
-                    <div className={styles.cardActions}>
-                      <button className={styles.btnAccept} disabled={loading===inv.id || dismissingId===inv.id} onClick={() => handleAccept(inv)}>
-                        {loading===inv.id ? <span className="spinner" style={{width:14,height:14}}/> : 'Aceptar'}
+                  {/* Botones de texto abajo a la derecha (como Android) */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}
+                    onClick={e => e.stopPropagation()}>
+                    {n.isSent ? (
+                      <button disabled={busy} onClick={n.onCancel}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px 20px',
+                          fontSize: 14, color: 'var(--text-secondary)', fontFamily: 'inherit' }}>
+                        {loading === n.dismissKey ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Cancelar'}
                       </button>
-                      <button className={styles.btnReject} disabled={loading===inv.id || dismissingId===inv.id} onClick={() => handleReject(inv)}>
-                        Rechazar
-                      </button>
-                    </div>
+                    ) : (
+                      <>
+                        <button disabled={busy} onClick={n.onReject}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px 20px',
+                            fontSize: 14, color: 'var(--text-secondary)', fontFamily: 'inherit' }}>
+                          Rechazar
+                        </button>
+                        <button disabled={busy} onClick={n.onAccept}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px 20px',
+                            fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'inherit' }}>
+                          {loading === n.dismissKey ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Aceptar'}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
-              ))}
-            </>
-        )}
-
-        {/* ── ENVIADAS ── */}
-        {tab === 'sent' && (
-          (sent.length === 0 && friendSent.length === 0)
-            ? <div className="empty-state">
-                <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-                <p>No hay solicitudes enviadas</p>
               </div>
-            : <>
-            {friendSent.map(f => (
-                <div key={'fr_' + f.uid} className={dismissingId === 'fr_' + f.uid ? styles.collapseWrap : undefined}>
-                  <div className={`${styles.card} ${dismissingId === 'fr_' + f.uid ? styles.cardDismissing : ''}`}>
-                    <div className={`${styles.typeIcon} ${styles.typeRequest}`}>
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                    </div>
-                    <div className={styles.cardInfo}>
-                      <p className={styles.cardTitle}>{f.username}</p>
-                      <p className={styles.cardSub}>Solicitud de amistad · Pendiente</p>
-                    </div>
-                    <button className={styles.btnCancel} disabled={dismissingId==='fr_'+f.uid} onClick={() => handleFriendCancel(f)}>
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            {sent.map(inv => (
-                <div key={inv.id} className={dismissingId === inv.id ? styles.collapseWrap : undefined}>
-                  <div className={`${styles.card} ${dismissingId === inv.id ? styles.cardDismissing : ''}`}>
-                    <div className={`${styles.typeIcon} ${inv.isFolder ? styles.typeFolder : styles.typeCounter}`}>
-                      {inv.isFolder
-                        ? <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                        : <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                      }
-                    </div>
-                    <div className={styles.cardInfo}>
-                      <p className={styles.cardTitle}>{inv.itemName}</p>
-                      <p className={styles.cardSub}>Para <strong>{inv.toUsername}</strong></p>
-                      <p className={styles.cardMeta}>{inv.role === 'editor' ? 'Editor' : 'Solo ver'} · Pendiente</p>
-                    </div>
-                    <button className={styles.btnCancel} disabled={loading===inv.id || dismissingId===inv.id} onClick={() => handleCancel(inv)}>
-                      {loading===inv.id ? <span className="spinner" style={{width:14,height:14}}/> : 'Cancelar'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </>
-        )}
+            )
+          })
+        })()}
+
       </div>
 
       {/* ── Dialog enviar invitación ── */}

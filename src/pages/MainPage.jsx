@@ -14,8 +14,9 @@ import {
   shareFolder, unshareFolder, getFolderInviteCode, getFolderMembers,
   setFolderMemberRole, removeFolderMember,
   listenSharedFolder, pushFolderUpdate,
-  getInviteCode, getMembers,
+  getInviteCode, getMembers, setMemberRole, removeMember,
 } from '../firebase/syncManager'
+import { getProfilesLite } from '../firebase/profileManager'
 import { uploadBackground as storageUpload, folderPath } from '../firebase/storageManager'
 import { requestAndRegisterFcm, onForegroundMessage } from '../firebase/messagingManager'
 import styles from './MainPage.module.css'
@@ -59,6 +60,7 @@ export default function MainPage() {
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
   const [showConfetti, setShowConfetti] = useState(false)
   const [sharedInfoSheet, setSharedInfoSheet] = useState(null) // { counter, inviteCode, members }
+  const [memberMenu, setMemberMenu] = useState(null) // { counter, member }
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
   const [editFolderColor, setEditFolderColor] = useState(null)
@@ -654,6 +656,28 @@ export default function MainPage() {
       username: m.username || (m.role === 'owner' && m.uid === currentUid ? currentUsername : counter.ownerUsername || m.username),
     }))
     setSharedInfoSheet(prev => prev ? { ...prev, inviteCode: code, members: fixed } : null)
+    // Fotos y nombre completo desde publicProfiles (como Android)
+    const profiles = await getProfilesLite(fixed.map(m => m.uid)).catch(() => ({}))
+    setSharedInfoSheet(prev => prev ? {
+      ...prev,
+      members: prev.members?.map(m => profiles[m.uid]
+        ? { ...m, photoUrl: profiles[m.uid].photoUrl, fullName: profiles[m.uid].fullName }
+        : m),
+    } : null)
+  }
+
+  // Acciones del owner sobre un miembro (rol / expulsar), como Android
+  const handleMemberAction = async (counter, member, action) => {
+    try {
+      if (action === 'remove') {
+        if (!confirm(`¿Eliminar a ${member.username} del contador?`)) return
+        await removeMember(counter.sharedId, member.uid)
+      } else {
+        await setMemberRole(counter.sharedId, member.uid, action)
+      }
+      setMemberMenu(null)
+      openSharedInfo(counter) // refrescar
+    } catch (e) { showToast('Error: ' + e.message) }
   }
 
   // ── Folder management ─────────────────────────────────────────────────────
@@ -839,15 +863,6 @@ export default function MainPage() {
         )}
 
         <div className={styles.headerActions}>
-          {/* Amigos */}
-          <div className={styles.iconWrap}>
-            <button className="btn-icon" onClick={() => navigate('/friends')} title="Amigos">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-              </svg>
-            </button>
-          </div>
-
           {/* Notificaciones (solicitudes + invitaciones, como Android) */}
           <div className={styles.iconWrap}>
             <button className="btn-icon" onClick={() => navigate('/invitations')} title="Notificaciones">
@@ -856,6 +871,15 @@ export default function MainPage() {
               </svg>
             </button>
             {(invBadge || friendBadge) && <div className="badge-dot" />}
+          </div>
+
+          {/* Amigos */}
+          <div className={styles.iconWrap}>
+            <button className="btn-icon" onClick={() => navigate('/friends')} title="Amigos">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+              </svg>
+            </button>
           </div>
 
           {/* Ajustes */}
@@ -1345,29 +1369,33 @@ export default function MainPage() {
       {sharedInfoSheet && (() => {
         const { counter, inviteCode, members } = sharedInfoSheet
         const INVITE_BASE = 'https://tosysy.github.io/CountAll/?code='
-        const qrUrl = inviteCode
-          ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=ffffff&color=000000&data=${encodeURIComponent(INVITE_BASE + inviteCode)}`
+        const shareUrl = inviteCode ? INVITE_BASE + inviteCode : null
+        const qrUrl = shareUrl
+          ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&bgcolor=ffffff&color=000000&data=${encodeURIComponent(shareUrl)}`
           : null
-        const ROLE_LABEL = { owner: 'Propietario', editor: 'Editor', viewer: 'Lector' }
-        const ROLE_ICON  = { owner: '👑', editor: '✏️', viewer: '👁️' }
+        const ROLE_LABEL = { owner: 'Propietario', editor: 'Editor', viewer: 'Solo lectura' }
+        const ROLE_COLOR = { owner: 'var(--btn-plus)', editor: '#1E88E5', viewer: 'var(--text-secondary)' }
+        const isOwner = counter.role === 'owner'
+        const avatarColorOf = (name = '') => {
+          let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+          return AVATAR_COLORS[h % AVATAR_COLORS.length]
+        }
         return (
           <div className="dialog-backdrop" onClick={() => setSharedInfoSheet(null)}>
-            <div className="dialog" onClick={e => e.stopPropagation()}>
+            <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxHeight: '85dvh', overflowY: 'auto' }}>
 
-              {/* Nombre del contador */}
-              <h3>{counter.name}</h3>
+              {/* Título como Android: "Compartir: nombre" */}
+              <h3>Compartir: <strong>{counter.name}</strong></h3>
 
-              {/* QR */}
-              {/* Contenedor blanco fijo — QR centrado con margen */}
+              {/* QR — tarjeta blanca centrada */}
               <div style={{
                 width: 160, height: 160,
-                background: '#fff', borderRadius: 20,
-                margin: '0 auto 10px',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+                background: '#fff', borderRadius: 16,
+                margin: '8px auto 8px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {qrUrl ? (
-                  <img src={qrUrl} alt="QR" style={{ width: 110, height: 110, display: 'block' }} />
+                  <img src={qrUrl} alt="QR" style={{ width: 140, height: 140, display: 'block' }} />
                 ) : (
                   <span style={{ fontSize: 12, color: '#888', textAlign: 'center', padding: '0 12px' }}>
                     {inviteCode === undefined ? 'Cargando…' : 'Solo el propietario puede ver el QR'}
@@ -1375,45 +1403,102 @@ export default function MainPage() {
                 )}
               </div>
 
-              {/* Código */}
+              {/* Píldora con el código (mantener pulsado en Android = copiar; aquí clic) */}
               {inviteCode && (
-                <code style={{ fontSize: 18, fontWeight: 800, letterSpacing: 3, textAlign: 'center',
-                  color: 'var(--text-primary)', fontFamily: 'monospace', display: 'block', marginBottom: 4 }}>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(inviteCode).catch(() => {}); showToast('Código copiado ✓') }}
+                  style={{ display: 'block', margin: '0 auto 4px', padding: '8px 16px',
+                    fontSize: 14, fontFamily: 'monospace', letterSpacing: 2,
+                    color: 'var(--text-primary)', background: 'var(--log-card-bg)',
+                    border: '1px solid var(--card-stroke)', borderRadius: 99, cursor: 'pointer' }}>
                   {inviteCode}
-                </code>
+                </button>
               )}
+
+              {/* Enviar a un amigo (invitación dentro de la app) */}
+              <button className="btn-primary"
+                style={{ width: '100%', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                onClick={() => {
+                  setSharedInfoSheet(null)
+                  navigate('/invitations', { state: { sendItem: {
+                    itemId: counter.id, sharedId: counter.sharedId, itemName: counter.name, isFolder: false,
+                  } } })
+                }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+                Enviar a un amigo
+              </button>
 
               {/* Separador */}
               <div style={{ height: 1, background: 'var(--card-stroke)', margin: '12px 0' }} />
 
-              {/* Miembros */}
-              <div style={{ textAlign: 'left' }}>
-                {!members || members.length === 0
-                  ? <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '8px 0' }}>{members === undefined ? 'Cargando…' : 'Sin miembros'}</p>
-                  : members.map(m => (
-                    <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0',
-                      borderBottom: '1px solid var(--card-stroke)' }}>
-                      <span style={{ fontSize: 16 }}>{ROLE_ICON[m.role] ?? '👤'}</span>
-                      <span style={{ flex: 1, fontSize: 14, color: 'var(--text-primary)', fontWeight: 600 }}>{m.username}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ROLE_LABEL[m.role] ?? m.role}</span>
+              {/* MIEMBROS (n) */}
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px' }}>
+                MIEMBROS ({members?.length ?? '…'})
+              </p>
+              {!members || members.length === 0
+                ? <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '8px 0' }}>{members === undefined ? 'Cargando…' : 'Sin miembros'}</p>
+                : members.map(m => {
+                  const clickable = isOwner && m.role !== 'owner'
+                  return (
+                    <div key={m.uid}
+                      onClick={clickable ? () => setMemberMenu({ counter, member: m }) : undefined}
+                      style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px',
+                        marginBottom: 8, borderRadius: 14, border: '1px solid var(--card-stroke)',
+                        background: 'var(--log-card-bg)', cursor: clickable ? 'pointer' : 'default' }}>
+                      {/* Avatar con foto de perfil (clic → perfil) */}
+                      <div
+                        onClick={e => { e.stopPropagation(); navigate(`/user/${m.uid}`) }}
+                        style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: m.photoUrl ? 'transparent' : avatarColorOf(m.username),
+                          color: '#fff', fontWeight: 800, fontSize: 18, cursor: 'pointer' }}>
+                        {m.photoUrl
+                          ? <img src={m.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : (m.username?.[0]?.toUpperCase() ?? '?')}
+                      </div>
+                      {/* Nombre completo + username */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m.fullName?.trim() || m.username}
+                        </p>
+                        {m.fullName?.trim() && (
+                          <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {m.username}
+                          </p>
+                        )}
+                      </div>
+                      {/* Chip de rol coloreado (como Android) */}
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', padding: '3px 8px',
+                        borderRadius: 20, background: ROLE_COLOR[m.role] ?? 'var(--text-secondary)', flexShrink: 0 }}>
+                        {ROLE_LABEL[m.role] ?? m.role}
+                      </span>
                     </div>
-                  ))
-                }
-              </div>
+                  )
+                })
+              }
 
-              {/* Acciones — mismo formato que el resto de diálogos */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              {/* Botones como Android: Cerrar / Enviar enlace */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
                 <button className="btn-ghost" onClick={() => setSharedInfoSheet(null)}>
                   Cerrar
                 </button>
-                {inviteCode && (
+                {shareUrl && (
                   <button className="btn-primary"
                     onClick={() => {
-                      navigator.clipboard.writeText(INVITE_BASE + inviteCode).catch(() => {})
-                      showToast('Enlace copiado ✓')
+                      const text = `Únete a mi contador "${counter.name}" en CountAll: ${shareUrl}`
+                      if (navigator.share) {
+                        navigator.share({ text }).catch(() => {})
+                      } else {
+                        navigator.clipboard.writeText(shareUrl).catch(() => {})
+                        showToast('Enlace copiado ✓')
+                      }
                       setSharedInfoSheet(null)
                     }}>
-                    Copiar enlace
+                    Enviar enlace
                   </button>
                 )}
               </div>
@@ -1421,6 +1506,21 @@ export default function MainPage() {
           </div>
         )
       })()}
+
+      {/* Menú de acciones sobre un miembro (solo owner), como Android */}
+      {memberMenu && (
+        <div className="dialog-backdrop" onClick={() => setMemberMenu(null)}>
+          <div className="dialog" onClick={e => e.stopPropagation()} style={{ maxWidth: 300 }}>
+            <h3>{memberMenu.member.username}</h3>
+            <button style={cMenuStyle} onClick={() => handleMemberAction(memberMenu.counter, memberMenu.member, 'editor')}>Editor</button>
+            <button style={cMenuStyle} onClick={() => handleMemberAction(memberMenu.counter, memberMenu.member, 'viewer')}>Solo lectura</button>
+            <button style={{ ...cMenuStyle, color: 'var(--danger)' }} onClick={() => handleMemberAction(memberMenu.counter, memberMenu.member, 'remove')}>Eliminar del contador</button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button className="btn-ghost" onClick={() => setMemberMenu(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}

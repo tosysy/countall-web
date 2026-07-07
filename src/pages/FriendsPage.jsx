@@ -175,7 +175,7 @@ export default function FriendsPage() {
               if (isSelf) return null
               return <UserCard key={f.uid} user={f} state={state}
                 isDismissing={dismissingId === f.uid}
-                onOpen={() => navigate(`/user/${f.uid}`)}
+                onOpen={() => navigate(`/user/${f.username || f.uid}`)}
                 onAdd={() => handleSendRequest(f.uid, f.username)}
                 onCancel={() => dismissThen(f.uid, () => handleCancelRequest(f.uid))}
                 onRemove={() => dismissThen(f.uid, () => handleRemove(f.uid))} />

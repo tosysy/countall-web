@@ -491,7 +491,7 @@ export default function App() {
           <Route path="/" element={<MainPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/friends" element={<FriendsPage />} />
-          <Route path="/user/:uid" element={<UserProfilePage />} />
+          <Route path="/user/:handle" element={<UserProfilePage />} />
           <Route path="/invitations" element={<InvitationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

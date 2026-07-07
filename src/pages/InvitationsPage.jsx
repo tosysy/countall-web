@@ -283,7 +283,7 @@ export default function InvitationsPage() {
               <div key={n.id} className={dismissingId === n.dismissKey ? styles.collapseWrap : undefined}>
                 <div
                   className={dismissingId === n.dismissKey ? styles.cardDismissing : undefined}
-                  onClick={() => n.uid && navigate(`/user/${n.uid}`)}
+                  onClick={() => (n.username || n.uid) && navigate(`/user/${n.username || n.uid}`)}
                   style={{ border: '1px solid var(--card-stroke)', borderRadius: 16, padding: 16,
                     marginBottom: 12, cursor: n.uid ? 'pointer' : 'default' }}>
                   {/* Fila superior: avatar + textos */}

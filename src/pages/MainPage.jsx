@@ -1451,7 +1451,7 @@ export default function MainPage() {
                         background: 'var(--log-card-bg)', cursor: clickable ? 'pointer' : 'default' }}>
                       {/* Avatar con foto de perfil (clic → perfil) */}
                       <div
-                        onClick={e => { e.stopPropagation(); navigate(`/user/${m.uid}`) }}
+                        onClick={e => { e.stopPropagation(); navigate(`/user/${m.username || m.uid}`) }}
                         style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           background: m.photoUrl ? 'transparent' : avatarColorOf(m.username),

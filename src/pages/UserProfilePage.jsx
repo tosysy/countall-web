@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getPublicProfile } from '../firebase/profileManager'
-import { getFriends, sendFriendRequest, acceptFriendRequest, removeFriend } from '../firebase/syncManager'
+import { getFriends, sendFriendRequest, acceptFriendRequest, removeFriend, getUserIdByUsername } from '../firebase/syncManager'
 import CompetitivePodium from '../components/CompetitivePodium'
 import useAppStore from '../store/appStore'
 import styles from './UserProfilePage.module.css'
@@ -25,15 +25,28 @@ const GENDER_LABEL = { male: 'Hombre', female: 'Mujer', other: 'Otro' }
  */
 export default function UserProfilePage() {
   const navigate = useNavigate()
-  const { uid: targetUid } = useParams()
+  // La URL lleva el username (/user/pablo); si no existe en el índice, se trata como uid
+  const { handle } = useParams()
   const myUid = useAppStore(s => s.user?.uid)
 
+  const [targetUid, setTargetUid] = useState(null)   // uid resuelto desde el username
   const [profile, setProfile] = useState(undefined) // undefined = cargando
   const [relation, setRelation] = useState('none')  // none | sent | received | accepted
   const [folderStack, setFolderStack] = useState([]) // navegación por carpetas públicas
   const [expanded, setExpanded] = useState(null)     // contador público ampliado
 
   useEffect(() => {
+    let alive = true
+    setProfile(undefined)
+    setTargetUid(null)
+    getUserIdByUsername(handle).catch(() => null).then(uid => {
+      if (alive) setTargetUid(uid ?? handle) // retrocompatibilidad con enlaces por uid
+    })
+    return () => { alive = false }
+  }, [handle])
+
+  useEffect(() => {
+    if (!targetUid) return
     let alive = true
     getPublicProfile(targetUid).then(p => { if (alive) setProfile(p) }).catch(() => setProfile(null))
     getFriends().then(list => {

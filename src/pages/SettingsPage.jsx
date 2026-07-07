@@ -159,7 +159,7 @@ export default function SettingsPage() {
 
           {/* Cabecera: avatar (clic = cambiar foto) + nombre/@usuario (clic = mi perfil) */}
           <button className={styles.rowBtn} style={{ padding: '18px 20px' }}
-            onClick={() => user?.uid && navigate(`/user/${user.uid}`)}>
+            onClick={() => (username || user?.uid) && navigate(`/user/${username || user.uid}`)}>
             <div className={styles.avatarSmall} style={{ width: 60, height: 60, fontSize: 24 }}
               onClick={e => { e.stopPropagation(); photoInputRef.current?.click() }}
               title="Cambiar foto de perfil">

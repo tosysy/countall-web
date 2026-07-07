@@ -58,8 +58,6 @@ export default function MainPage() {
   const [expandedInitialTab, setExpandedInitialTab] = useState('log')
   const [counterMenu, setCounterMenu] = useState(null) // { counter, top, right }
   const [showConfetti, setShowConfetti] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [showSearch, setShowSearch] = useState(false)
   const [sharedInfoSheet, setSharedInfoSheet] = useState(null) // { counter, inviteCode, members }
   const [editingFolder, setEditingFolder] = useState(null)
   const [editFolderName, setEditFolderName] = useState('')
@@ -222,8 +220,8 @@ export default function MainPage() {
     // Lanzar preview automáticamente
     getPreviewByCode(code).then(preview => {
       if (preview) setJoinPreview(preview)
-      else showToast('Enlace inválido o no encontrado')
-    }).catch(() => showToast('Error al procesar el enlace'))
+      else { setShowJoin(false); showToast('Enlace inválido o no encontrado') }
+    }).catch(() => { setShowJoin(false); showToast('Error al procesar el enlace') })
   }, [location.state?.pendingCode]) // eslint-disable-line
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -445,17 +443,6 @@ export default function MainPage() {
       useAppStore.getState().folderOrders,
       driveToken
     )
-  }
-
-  const handleJoinPreview = async () => {
-    if (!joinInput.trim()) return
-    setJoinLoading(true)
-    try {
-      const preview = await getPreviewByCode(joinInput.trim())
-      if (!preview) { showToast('Código no válido'); return }
-      setJoinPreview(preview)
-    } catch (e) { showToast(e.message) }
-    finally { setJoinLoading(false) }
   }
 
   const handleJoinConfirm = async () => {
@@ -859,26 +846,17 @@ export default function MainPage() {
                 <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
               </svg>
             </button>
-            {friendBadge && <div className="badge-dot" />}
           </div>
 
-          {/* Invitaciones */}
+          {/* Notificaciones (solicitudes + invitaciones, como Android) */}
           <div className={styles.iconWrap}>
-            <button className="btn-icon" onClick={() => navigate('/invitations')} title="Invitaciones">
+            <button className="btn-icon" onClick={() => navigate('/invitations')} title="Notificaciones">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
               </svg>
             </button>
-            {invBadge && <div className="badge-dot" />}
+            {(invBadge || friendBadge) && <div className="badge-dot" />}
           </div>
-
-          {/* Buscar */}
-          <button className="btn-icon" title="Buscar"
-            onClick={() => { setShowSearch(v => { if (v) setSearchTerm(''); return !v }) }}>
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
-          </button>
 
           {/* Ajustes */}
           <button className="btn-icon" onClick={() => navigate('/settings')} title="Ajustes">
@@ -889,71 +867,8 @@ export default function MainPage() {
         </div>
       </header>}
 
-      {/* ── Búsqueda por nombre ─────────────────────────────────────────── */}
-      {showSearch && !selectionMode && (
-        <div style={{ padding: '0 16px 12px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            border: '1.5px solid var(--card-stroke)', borderRadius: 14, padding: '10px 14px',
-          }}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
-            <input autoFocus value={searchTerm} placeholder="Buscar contadores y carpetas..."
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 15 }} />
-            {searchTerm && (
-              <button className="btn-icon" style={{ padding: 2 }} onClick={() => setSearchTerm('')}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Resultados de búsqueda (en todas las carpetas) ─────────────── */}
-      {showSearch && searchTerm.trim() ? (() => {
-        const q = searchTerm.trim().toLowerCase()
-        const matchedCounters = counters.filter(c => c.name?.toLowerCase().includes(q))
-        const matchedFolders = folders.filter(f => f.name?.toLowerCase().includes(q))
-        if (matchedCounters.length === 0 && matchedFolders.length === 0) {
-          return (
-            <div className="empty-state">
-              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-              <p>Sin resultados para «{searchTerm.trim()}»</p>
-            </div>
-          )
-        }
-        return (
-          <div className="counter-grid">
-            {matchedFolders.map(f => (
-              <div key={`F:${f.id}`} className={styles.gridItem}>
-                <FolderCard
-                  folder={f}
-                  folderCounters={getFolderCounters(f.id)}
-                  subFolders={folders.filter(x => x.parentFolderId === f.id)}
-                  folderOrder={folderOrders[f.id] ?? []}
-                  onClick={(fl) => { setShowSearch(false); setSearchTerm(''); setCurrentFolder(fl.id) }}
-                />
-              </div>
-            ))}
-            {matchedCounters.map(c => (
-              <div key={`C:${c.id}`} className={styles.gridItem}>
-                <CounterCard
-                  counter={c}
-                  onIncrement={() => handleIncrement(useAppStore.getState().counters.find(x => x.id === c.id) ?? c)}
-                  onDecrement={() => handleDecrement(useAppStore.getState().counters.find(x => x.id === c.id) ?? c)}
-                  onClick={(cc) => { setExpandedInitialTab('log'); setExpanded(cc) }}
-                  onSharedBadge={(cc) => openSharedInfo(cc)}
-                />
-              </div>
-            ))}
-          </div>
-        )
-      })() :
-
-      /* ── Grid ───────────────────────────────────────────────────────── */
-      items.length === 0 ? (
+      {/* ── Grid ───────────────────────────────────────────────────────── */}
+      {items.length === 0 ? (
         <div className="empty-state">
           <svg viewBox="0 0 24 24" width="56" height="56" fill="currentColor">
             <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
@@ -1052,13 +967,13 @@ export default function MainPage() {
               </div>
               <span>Nueva carpeta</span>
             </button>
-            <button className={styles.fabMenuItem} onClick={() => { setShowFab(false); setShowJoin(true); setJoinInput(''); setJoinPreview(null) }}>
+            <button className={styles.fabMenuItem} onClick={() => { setShowFab(false); setShowQrScanner(true) }}>
               <div className={styles.fabMenuIcon}>
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                  <path d="M3 3h7v7H3zm1 1v5h5V4zm1 1h3v3H5zM14 3h7v7h-7zm1 1v5h5V4zm1 1h3v3h-3zM3 14h7v7H3zm1 1v5h5v-5zm1 1h3v3H5zM14 14h2v2h-2zm3 0h2v2h-2zm0 3h2v2h-2zm-3 0h2v2h-2zm0 3h2v2h-2zm3-3h2v2h-2z"/>
                 </svg>
               </div>
-              <span>Unirse con código</span>
+              <span>Escanear QR</span>
             </button>
           </div>
         </div>
@@ -1293,28 +1208,15 @@ export default function MainPage() {
       {showJoin && (
         <div className="dialog-backdrop" onClick={() => { setShowJoin(false); setJoinPreview(null) }}>
           <div className="dialog" onClick={e => e.stopPropagation()}>
-            <h3>Unirse con código</h3>
+            <h3>Unirse</h3>
             {!joinPreview ? (
               <>
-                <p>Introduce el código de invitación</p>
-                <div style={{ display:'flex', gap:'8px' }}>
-                  <input className="input-field" placeholder="Código"
-                    value={joinInput} autoFocus style={{ flex: 1 }}
-                    onChange={e => setJoinInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleJoinPreview()} />
-                  <button className="btn-ghost" style={{ padding:'0 12px', flexShrink:0 }}
-                    onClick={() => { setShowJoin(false); setShowQrScanner(true) }}
-                    title="Escanear QR">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                      <path d="M3 3h7v7H3zm1 1v5h5V4zm1 1h3v3H5zM14 3h7v7h-7zm1 1v5h5V4zm1 1h3v3h-3zM3 14h7v7H3zm1 1v5h5v-5zm1 1h3v3H5zM14 14h2v2h-2zm3 0h2v2h-2zm0 3h2v2h-2zm-3 0h2v2h-2zm0 3h2v2h-2zm3-3h2v2h-2z"/>
-                    </svg>
-                  </button>
+                <div style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0' }}>
+                  <span className="spinner" style={{ width:18, height:18 }} />
+                  <p style={{ margin:0, fontSize:14, color:'var(--text-secondary)' }}>Buscando invitación…</p>
                 </div>
                 <div style={{ display:'flex', gap:'8px', marginTop:'16px', justifyContent:'flex-end' }}>
                   <button className="btn-ghost" onClick={() => setShowJoin(false)}>Cancelar</button>
-                  <button className="btn-primary" onClick={handleJoinPreview} disabled={joinLoading}>
-                    {joinLoading ? <span className="spinner" style={{ width:16, height:16 }} /> : 'Continuar'}
-                  </button>
                 </div>
               </>
             ) : (
@@ -1361,7 +1263,12 @@ export default function MainPage() {
               if (p) code = p
             } catch { /* raw no es URL → usarlo tal cual */ }
             setJoinInput(code)
+            setJoinPreview(null)
             setShowJoin(true)
+            getPreviewByCode(code).then(preview => {
+              if (preview) setJoinPreview(preview)
+              else { setShowJoin(false); showToast('Código no válido') }
+            }).catch(() => { setShowJoin(false); showToast('Error al procesar el código') })
           }}
           onClose={() => setShowQrScanner(false)}
         />
@@ -1445,10 +1352,10 @@ export default function MainPage() {
         const ROLE_ICON  = { owner: '👑', editor: '✏️', viewer: '👁️' }
         return (
           <div className="dialog-backdrop" onClick={() => setSharedInfoSheet(null)}>
-            <div className="dialog" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
+            <div className="dialog" onClick={e => e.stopPropagation()}>
 
               {/* Nombre del contador */}
-              <h3 style={{ margin: '0 0 16px' }}>{counter.name}</h3>
+              <h3>{counter.name}</h3>
 
               {/* QR */}
               {/* Contenedor blanco fijo — QR centrado con margen */}
@@ -1470,7 +1377,7 @@ export default function MainPage() {
 
               {/* Código */}
               {inviteCode && (
-                <code style={{ fontSize: 18, fontWeight: 800, letterSpacing: 3,
+                <code style={{ fontSize: 18, fontWeight: 800, letterSpacing: 3, textAlign: 'center',
                   color: 'var(--text-primary)', fontFamily: 'monospace', display: 'block', marginBottom: 4 }}>
                   {inviteCode}
                 </code>
@@ -1494,14 +1401,13 @@ export default function MainPage() {
                 }
               </div>
 
-              {/* Acciones */}
-              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <button className="btn-ghost" style={{ flex: 1 }}
-                  onClick={() => setSharedInfoSheet(null)}>
+              {/* Acciones — mismo formato que el resto de diálogos */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+                <button className="btn-ghost" onClick={() => setSharedInfoSheet(null)}>
                   Cerrar
                 </button>
                 {inviteCode && (
-                  <button className="btn-primary" style={{ flex: 1 }}
+                  <button className="btn-primary"
                     onClick={() => {
                       navigator.clipboard.writeText(INVITE_BASE + inviteCode).catch(() => {})
                       showToast('Enlace copiado ✓')

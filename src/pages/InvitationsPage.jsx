@@ -5,6 +5,7 @@ import {
   acceptInvitation, acceptFolderInvitation, rejectInvitation,
   cancelSentInvitation, sendInvitation, acceptEditRequest,
   shareCounter, shareFolder, schedulePushPersonalData, getFriends,
+  listenFriendRequests, acceptFriendRequest, removeFriend,
 } from '../firebase/syncManager'
 import useAppStore from '../store/appStore'
 import styles from './InvitationsPage.module.css'
@@ -22,6 +23,8 @@ export default function InvitationsPage() {
   const [sendForm, setSendForm] = useState({ itemId:'', sharedId:'', itemName:'', toUsername:'', role:'viewer', isFolder:false })
   const [sendLoading, setSendLoading] = useState(false)
   const [friendSuggestions, setFriendSuggestions] = useState([])
+  const [friendReceived, setFriendReceived] = useState([]) // solicitudes de amistad recibidas
+  const [friendSent, setFriendSent] = useState([])         // solicitudes de amistad enviadas
 
   const showToast = (t) => { setToast(t); setTimeout(() => setToast(null), 3000) }
 
@@ -33,9 +36,42 @@ export default function InvitationsPage() {
   useEffect(() => {
     const u1 = listenInvitations(setReceived)
     const u2 = listenSentInvitations(setSent)
-    getFriends().then(list => setFriendSuggestions(list.filter(f => f.status === 'accepted').map(f => f.username)))
-    return () => { u1(); u2() }
+    const u3 = listenFriendRequests(setFriendReceived)
+    loadFriendData()
+    return () => { u1(); u2(); u3() }
   }, [])
+
+  const loadFriendData = async () => {
+    const list = await getFriends().catch(() => [])
+    setFriendSuggestions(list.filter(f => f.status === 'accepted').map(f => f.username))
+    setFriendSent(list.filter(f => f.status === 'pending' && f.direction === 'sent'))
+  }
+
+  // ── Solicitudes de amistad (unificadas aquí, como Android) ────────────────
+  const handleFriendAccept = async (f) => {
+    setLoading('fr_' + f.uid)
+    try {
+      await acceptFriendRequest(f.uid)
+      setFriendReceived(r => r.filter(x => x.uid !== f.uid))
+      showToast('Solicitud aceptada ✓')
+      loadFriendData()
+    } catch (e) { showToast('Error: ' + e.message) }
+    finally { setLoading(null) }
+  }
+
+  const handleFriendReject = (f) => {
+    dismissThen('fr_' + f.uid, async () => {
+      try { await removeFriend(f.uid); setFriendReceived(r => r.filter(x => x.uid !== f.uid)); showToast('Solicitud rechazada') }
+      catch (e) { showToast('Error: ' + e.message) }
+    })
+  }
+
+  const handleFriendCancel = (f) => {
+    dismissThen('fr_' + f.uid, async () => {
+      try { await removeFriend(f.uid); setFriendSent(r => r.filter(x => x.uid !== f.uid)); showToast('Solicitud cancelada') }
+      catch (e) { showToast('Error: ' + e.message) }
+    })
+  }
 
   const handleAccept = async (inv) => {
     setLoading(inv.id)
@@ -133,7 +169,7 @@ export default function InvitationsPage() {
             <path d="M19 12H5M12 5l-7 7 7 7"/>
           </svg>
         </button>
-        <h1 className={styles.title}>Invitaciones</h1>
+        <h1 className={styles.title}>Notificaciones</h1>
         {allOwnedItems.length > 0 && (
           <button className={styles.btnNew} onClick={() => setShowSend(true)} title="Nueva invitación">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -152,7 +188,7 @@ export default function InvitationsPage() {
         ].map(t => (
           <button key={t.id} className={`${styles.tab} ${tab===t.id?styles.active:''}`} onClick={() => setTab(t.id)}>
             {t.label}
-            {t.id==='received' && received.length>0 && <span className={styles.tabBadge} />}
+            {t.id==='received' && (received.length>0 || friendReceived.length>0) && <span className={styles.tabBadge} />}
           </button>
         ))}
       </div>
@@ -162,14 +198,36 @@ export default function InvitationsPage() {
 
         {/* ── RECIBIDAS ── */}
         {tab === 'received' && (
-          received.length === 0
+          (received.length === 0 && friendReceived.length === 0)
             ? <div className="empty-state">
                 <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor">
-                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                  <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
                 </svg>
-                <p>No hay invitaciones recibidas</p>
+                <p>No hay notificaciones</p>
               </div>
-            : received.map(inv => (
+            : <>
+            {friendReceived.map(f => (
+                <div key={'fr_' + f.uid} className={dismissingId === 'fr_' + f.uid ? styles.collapseWrap : undefined}>
+                  <div className={`${styles.card} ${dismissingId === 'fr_' + f.uid ? styles.cardDismissing : ''}`}>
+                    <div className={`${styles.typeIcon} ${styles.typeRequest}`}>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </div>
+                    <div className={styles.cardInfo}>
+                      <p className={styles.cardTitle}>{f.username}</p>
+                      <p className={styles.cardSub}>Quiere ser tu amigo</p>
+                    </div>
+                    <div className={styles.cardActions}>
+                      <button className={styles.btnAccept} disabled={loading==='fr_'+f.uid || dismissingId==='fr_'+f.uid} onClick={() => handleFriendAccept(f)}>
+                        {loading==='fr_'+f.uid ? <span className="spinner" style={{width:14,height:14}}/> : 'Aceptar'}
+                      </button>
+                      <button className={styles.btnReject} disabled={loading==='fr_'+f.uid || dismissingId==='fr_'+f.uid} onClick={() => handleFriendReject(f)}>
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            {received.map(inv => (
                 <div key={inv.id} className={dismissingId === inv.id ? styles.collapseWrap : undefined}>
                   <div className={`${styles.card} ${dismissingId === inv.id ? styles.cardDismissing : ''}`}>
                     {/* Icono tipo */}
@@ -207,19 +265,37 @@ export default function InvitationsPage() {
                     </div>
                   </div>
                 </div>
-              ))
+              ))}
+            </>
         )}
 
         {/* ── ENVIADAS ── */}
         {tab === 'sent' && (
-          sent.length === 0
+          (sent.length === 0 && friendSent.length === 0)
             ? <div className="empty-state">
                 <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor">
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                 </svg>
-                <p>No hay invitaciones enviadas</p>
+                <p>No hay solicitudes enviadas</p>
               </div>
-            : sent.map(inv => (
+            : <>
+            {friendSent.map(f => (
+                <div key={'fr_' + f.uid} className={dismissingId === 'fr_' + f.uid ? styles.collapseWrap : undefined}>
+                  <div className={`${styles.card} ${dismissingId === 'fr_' + f.uid ? styles.cardDismissing : ''}`}>
+                    <div className={`${styles.typeIcon} ${styles.typeRequest}`}>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </div>
+                    <div className={styles.cardInfo}>
+                      <p className={styles.cardTitle}>{f.username}</p>
+                      <p className={styles.cardSub}>Solicitud de amistad · Pendiente</p>
+                    </div>
+                    <button className={styles.btnCancel} disabled={dismissingId==='fr_'+f.uid} onClick={() => handleFriendCancel(f)}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            {sent.map(inv => (
                 <div key={inv.id} className={dismissingId === inv.id ? styles.collapseWrap : undefined}>
                   <div className={`${styles.card} ${dismissingId === inv.id ? styles.cardDismissing : ''}`}>
                     <div className={`${styles.typeIcon} ${inv.isFolder ? styles.typeFolder : styles.typeCounter}`}>
@@ -238,7 +314,8 @@ export default function InvitationsPage() {
                     </button>
                   </div>
                 </div>
-              ))
+              ))}
+            </>
         )}
       </div>
 

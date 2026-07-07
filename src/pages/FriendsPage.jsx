@@ -14,7 +14,6 @@ function avatarColor(name = '') {
 export default function FriendsPage() {
   const navigate = useNavigate()
   const { user } = useAppStore()
-  const [tab, setTab] = useState('friends')
   const [friends, setFriends] = useState([])
   const [received, setReceived] = useState([])
   const [pendingSent, setPendingSent] = useState([])
@@ -123,25 +122,8 @@ export default function FriendsPage() {
         <h1 className={styles.title}>Amigos</h1>
       </header>
 
-      {/* Tab bar */}
-      <div className={styles.tabs}>
-        <div className={styles.tabIndicator}
-          style={{ transform: `translateX(${{ friends:0, sent:1, received:2 }[tab] * 100}%)`, width: '33.33%' }} />
-        {[
-          { id:'friends', label:'Amigos' },
-          { id:'sent',    label:'Enviadas' },
-          { id:'received',label:'Recibidas' },
-        ].map(t => (
-          <button key={t.id} className={`${styles.tab} ${tab === t.id ? styles.active : ''}`}
-            onClick={() => { setTab(t.id); clearSearch() }}>
-            {t.label}
-            {t.id === 'received' && received.length > 0 && <span className={styles.tabBadge} />}
-          </button>
-        ))}
-      </div>
-
-      {/* Search bar — debajo de las pestañas, solo en Amigos */}
-      {tab === 'friends' && (
+      {/* Search bar — búsqueda global de usuarios (las solicitudes viven en Notificaciones) */}
+      {(
         <div className={styles.searchWrap}>
           <div className={styles.searchBox}>
             {searching
@@ -172,7 +154,7 @@ export default function FriendsPage() {
       <div className={styles.list}>
 
         {/* ── AMIGOS / BÚSQUEDA ── */}
-        {tab === 'friends' && (
+        {(
           <>
             {inSearchMode && (
               <p className={styles.sectionLabel}>
@@ -201,35 +183,6 @@ export default function FriendsPage() {
           </>
         )}
 
-        {/* ── ENVIADAS ── */}
-        {tab === 'sent' && (
-          pendingSent.length === 0
-            ? <div className="empty-state">
-                <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-                <p>No hay solicitudes enviadas</p>
-              </div>
-            : pendingSent.map(f => (
-                <UserCard key={f.uid} user={f} state="sent"
-                  isDismissing={dismissingId === f.uid}
-                  onCancel={() => dismissThen(f.uid, () => handleCancelRequest(f.uid))} />
-              ))
-        )}
-
-        {/* ── RECIBIDAS ── */}
-        {tab === 'received' && (
-          received.length === 0
-            ? <div className="empty-state">
-                <svg viewBox="0 0 24 24" width="52" height="52" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-                <p>No hay solicitudes recibidas</p>
-              </div>
-            : received.map(f => (
-                <UserCard key={f.uid} user={f} state="received"
-                  isDismissing={dismissingId === f.uid}
-                  onOpen={() => navigate(`/user/${f.uid}`)}
-                  onAccept={() => handleAccept(f)}
-                  onReject={() => dismissThen(f.uid, () => handleReject(f))} />
-              ))
-        )}
       </div>
     </div>
     </div>

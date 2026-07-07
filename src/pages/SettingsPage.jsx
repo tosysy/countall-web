@@ -4,6 +4,7 @@ import { updateProfile } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import { isUsernameAvailable, setUsername, signOut as firebaseSignOut } from '../firebase/auth'
 import { deleteAccount } from '../firebase/syncManager'
+import { unregisterFcmToken } from '../firebase/messagingManager'
 import useAppStore from '../store/appStore'
 import styles from './SettingsPage.module.css'
 
@@ -50,6 +51,8 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     setSigningOut(true)
+    // Retirar el token FCM ANTES de perder la sesión (necesita el uid)
+    await unregisterFcmToken().catch(() => {})
     // Firebase sign-out dispara onAuthStateChanged(null) en App.jsx,
     // que se encarga de limpiar datos y navegar al login.
     await firebaseSignOut()
@@ -60,6 +63,7 @@ export default function SettingsPage() {
     if (deleteText !== 'BORRAR') return
     setDeleting(true)
     try {
+      await unregisterFcmToken().catch(() => {})
       const { driveToken: token } = useAppStore.getState()
       await deleteAccount(token)
       await auth.currentUser.delete()

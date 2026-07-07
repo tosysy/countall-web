@@ -69,7 +69,7 @@ function LoadingModal({ message, progress, variant = 'load' }) {
         </svg>
       ) : (
         <img
-          src="https://raw.githubusercontent.com/tosysy/CountAll/main/icon-192.png"
+          src={`${import.meta.env.BASE_URL}icon-192.png`}
           alt="CountAll" width="72" height="72"
           style={{ borderRadius: 18, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}
         />

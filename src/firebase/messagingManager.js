@@ -12,8 +12,11 @@ import { ref, set, remove } from 'firebase/database'
 import app from './config'
 import { db, auth } from './config'
 
-// ─── Pon aquí tu clave VAPID (Firebase Console → Project settings → Cloud Messaging) ──
-const VAPID_KEY = 'REEMPLAZA_CON_TU_VAPID_KEY'
+// Clave pública VAPID (Firebase Console → Project settings → Cloud Messaging →
+// Web Push certificates). No es secreta; puede ir en el código o en
+// VITE_FCM_VAPID_KEY. Sin ella, las notificaciones push quedan desactivadas.
+const VAPID_KEY = import.meta.env.VITE_FCM_VAPID_KEY ?? 'REEMPLAZA_CON_TU_VAPID_KEY'
+const VAPID_OK = VAPID_KEY && !VAPID_KEY.startsWith('REEMPLAZA')
 
 const SW_URL   = '/countall-web/firebase-messaging-sw.js'
 const SW_SCOPE = '/countall-web/'
@@ -32,6 +35,7 @@ function encodeToken(token) {
 // ─── Solicitar permiso + registrar token ─────────────────────────────────────
 
 export async function requestAndRegisterFcm() {
+  if (!VAPID_OK) return null
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return null
   if (Notification.permission === 'denied') return null
 

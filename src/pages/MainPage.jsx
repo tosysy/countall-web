@@ -186,10 +186,13 @@ export default function MainPage() {
     }
     // Mensajes en primer plano: reutilizar el sistema de counterNotif existente
     const unsub = onForegroundMessage((payload) => {
-      const title = payload.notification?.title ?? ''
-      const body  = payload.notification?.body  ?? ''
-      const text  = title && body ? `${title}: ${body}` : (body || title)
-      const sharedId = payload.data?.sharedId ?? null
+      // Las Cloud Functions envían mensajes DATA-only (título/cuerpo en data)
+      const data  = payload.data ?? {}
+      if (data.type === 'PERSONAL_SYNC') return // silencioso: lo gestiona listenDataVersion
+      const title = data.title ?? payload.notification?.title ?? ''
+      const body  = data.body  ?? payload.notification?.body  ?? ''
+      const text  = title && body && title !== 'CountAll' ? `${title}: ${body}` : (body || title)
+      const sharedId = data.sharedId ?? null
       // Buscar el contador local asociado a este sharedId
       const linkedCounter = sharedId
         ? useAppStore.getState().counters.find(c => c.sharedId === sharedId)

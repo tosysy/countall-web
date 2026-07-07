@@ -1,5 +1,7 @@
 // Service Worker para FCM (Firebase Cloud Messaging)
-// Maneja notificaciones push cuando la app está en background o cerrada.
+// Las Cloud Functions envían mensajes DATA-only (igual que para Android):
+// { type, title, body, sharedId?, fromUid?, fromUsername?, dataVersion? }
+// Este SW construye la notificación a partir de esos datos.
 importScripts('https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.14.0/firebase-messaging-compat.js')
 
@@ -15,31 +17,53 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging()
 
+const APP_URL = 'https://tosysy.github.io/countall-web/'
+const ICON = '/countall-web/icon-192.png'
+
 // Notificación cuando la app está en segundo plano / cerrada
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title ?? 'CountAll'
-  const body  = payload.notification?.body  ?? ''
-  const sharedId = payload.data?.sharedId ?? ''
+  const data = payload.data ?? {}
+  const type = data.type ?? ''
+
+  // Push silencioso de sincronización personal — no mostrar nada
+  if (type === 'PERSONAL_SYNC') return
+
+  const title = data.title ?? payload.notification?.title ?? 'CountAll'
+  const body  = data.body  ?? payload.notification?.body  ?? ''
+  const sharedId = data.sharedId ?? ''
+
+  const tag =
+    type === 'counter_change' && sharedId ? `counter-${sharedId}` :
+    type === 'friend_request' || type === 'friend_accepted' ? `friend-${data.fromUid ?? ''}` :
+    'countall'
 
   self.registration.showNotification(title, {
     body,
-    icon:     'https://raw.githubusercontent.com/tosysy/CountAll/main/icon-192.png',
-    badge:    'https://raw.githubusercontent.com/tosysy/CountAll/main/icon-192.png',
-    tag:      sharedId ? `counter-${sharedId}` : 'countall',
+    icon:     ICON,
+    badge:    ICON,
+    tag,
     renotify: true,
-    data:     payload.data ?? {},
+    data,
   })
 })
 
-// Al hacer clic en la notificación → abrir/enfocar la app
+// Al hacer clic en la notificación → abrir/enfocar la app en la sección adecuada
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const appUrl = 'https://tosysy.github.io/countall-web/'
+  const type = event.notification.data?.type ?? ''
+  const target =
+    type === 'friend_request' ? APP_URL + 'friends' :
+    type === 'friend_accepted' ? APP_URL + 'friends' :
+    APP_URL
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      const existing = list.find(c => c.url.startsWith(appUrl))
-      if (existing) return existing.focus()
-      return clients.openWindow(appUrl)
+      const existing = list.find(c => c.url.startsWith(APP_URL))
+      if (existing) {
+        existing.focus()
+        if (target !== APP_URL) existing.navigate?.(target)
+        return
+      }
+      return clients.openWindow(target)
     })
   )
 })

@@ -503,12 +503,12 @@ export default function MainPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [derivedKeysSig, currentFolderId])
 
-  // ── Drag stack overlay (replica de la app Android) ──────────────────────────
-  const draggingKeyRef    = useRef(null)
-  const stackHiddenRef    = useRef([])   // elementos DOM originales ocultos
-  const stackClonesRef    = useRef([])   // { el, startX, startY, width, height, offset }
-  const stackMoveRef      = useRef(null) // handler pointermove/touchmove
-  const stackRafRef       = useRef(null) // rAF id de la animación
+  // ── Drag & drop ─────────────────────────────────────────────────────────────
+  const draggingKeyRef = useRef(null)
+  // Otros ítems seleccionados que "acompañan" al arrastrado (multi-drag). Se
+  // gestiona por ESTADO de React (una clase que los atenúa), sin clonar ni tocar
+  // el DOM a mano: eso era lo que dejaba tarjetas fantasma pegadas.
+  const [followingKeys, setFollowingKeys] = useState(() => new Set())
 
   // Aplica el multi-move al soltar: todos los seleccionados quedan junto al arrastrado
   const applyMultiMove = (order, draggedKey) => {
@@ -529,112 +529,14 @@ export default function MainPage() {
     isDraggingRef.current = true
     const dk = evt.item?.getAttribute('data-id') ?? null
     draggingKeyRef.current = dk
-    if (!dk || !selectedKeys.has(dk) || selectedKeys.size <= 1) return
-
-    // ── Crear clones flotantes de los otros ítems seleccionados ─────────────
-    const container = evt.from
-    const clones = []
-    const hidden = []
-
-    for (const child of Array.from(container.children)) {
-      const key = child.getAttribute('data-id')
-      if (!key || key === dk || !selectedKeys.has(key)) continue
-
-      const rect = child.getBoundingClientRect()
-      const clone = child.cloneNode(true)
-
-      // Posicionar el clon encima del ítem original (posición fija en viewport)
-      clone.style.cssText = `
-        position:fixed;left:0;top:0;
-        width:${rect.width}px;height:${rect.height}px;
-        transform:translate(${rect.left}px,${rect.top}px);
-        pointer-events:none;border-radius:16px;overflow:hidden;
-        box-shadow:0 8px 28px rgba(0,0,0,.32);opacity:.9;
-        will-change:transform;z-index:99990;
-      `
-      // Quitar overlay de selección del clon
-      clone.querySelector('[data-sel-overlay]')?.remove()
-
-      document.body.appendChild(clone)
-
-      // Offset aleatorio para el efecto de "pila" (igual que Android)
-      const offset = {
-        dx:  (Math.random() - 0.5) * 22,
-        dy:  (Math.random() - 0.5) * 22,
-        rot: (Math.random() - 0.5) * 12,
-      }
-      clones.push({ el: clone, startX: rect.left, startY: rect.top,
-                    width: rect.width, height: rect.height, offset })
-
-      // Ocultar el original (mantiene su espacio en el grid, como SortableJS con el dragged)
-      child.style.opacity = '0'
-      hidden.push(child)
+    // Multi-drag: atenuar los demás seleccionados; se agruparán al soltar.
+    if (dk && selectedKeys.has(dk) && selectedKeys.size > 1) {
+      setFollowingKeys(new Set([...selectedKeys].filter(k => k !== dk)))
     }
-
-    stackClonesRef.current = clones
-    stackHiddenRef.current = hidden
-
-    // Posición inicial del drag (centro del ítem arrastrado)
-    const ghostRect = evt.item.getBoundingClientRect()
-    let px = ghostRect.left + ghostRect.width  / 2
-    let py = ghostRect.top  + ghostRect.height / 2
-
-    // Seguir el puntero/dedo
-    const onMove = (e) => {
-      px = e.touches ? e.touches[0].clientX : e.clientX
-      py = e.touches ? e.touches[0].clientY : e.clientY
-    }
-    document.addEventListener('pointermove', onMove, { passive: true })
-    document.addEventListener('touchmove',   onMove, { passive: true })
-    stackMoveRef.current = onMove
-
-    // Animación fly-in estilo Android: cada clon vuela desde su posición original
-    // hasta quedar apilado detrás del cursor (con stagger como la app)
-    const FLY_DURATION = 260
-    const FLY_STAGGER  = 40
-    const startTime = performance.now()
-
-    const animate = () => {
-      const elapsed = performance.now() - startTime
-      clones.forEach((c, i) => {
-        const cardElapsed = elapsed - i * FLY_STAGGER
-        const targetX = px - c.width  / 2 + c.offset.dx
-        const targetY = py - c.height / 2 + c.offset.dy
-
-        let x, y, rot
-        if (cardElapsed <= 0) {
-          x = c.startX; y = c.startY; rot = 0
-        } else {
-          const rawT = Math.min(1, cardElapsed / FLY_DURATION)
-          const t = 1 - Math.pow(1 - rawT, 3)  // ease-out cúbico (= DecelerateInterpolator)
-          x   = c.startX + (targetX - c.startX) * t
-          y   = c.startY + (targetY - c.startY) * t
-          rot = c.offset.rot * t
-        }
-        c.el.style.transform = `translate(${x}px,${y}px) rotate(${rot}deg)`
-      })
-      stackRafRef.current = requestAnimationFrame(animate)
-    }
-    stackRafRef.current = requestAnimationFrame(animate)
   }
 
   const handleDragEnd = () => {
-    // Eliminar clones del overlay
-    stackClonesRef.current.forEach(c => c.el.parentNode?.removeChild(c.el))
-    stackClonesRef.current = []
-
-    // Restaurar ítems originales ocultos
-    stackHiddenRef.current.forEach(el => { el.style.opacity = '' })
-    stackHiddenRef.current = []
-
-    // Limpiar listeners y animación
-    if (stackMoveRef.current) {
-      document.removeEventListener('pointermove', stackMoveRef.current)
-      document.removeEventListener('touchmove',   stackMoveRef.current)
-      stackMoveRef.current = null
-    }
-    cancelAnimationFrame(stackRafRef.current)
-    stackRafRef.current = null
+    setFollowingKeys(new Set())
 
     // Confirmar el orden final (de la lista local) al store, aplicando el multi-move.
     const finalOrder = applyMultiMove(
@@ -945,9 +847,9 @@ export default function MainPage() {
           ghostClass={styles.sortableGhost}
           chosenClass={styles.sortableChosen}
           dragClass={styles.sortableDrag}
-          delay={180}
+          delay={120}
           delayOnTouchOnly={true}
-          touchStartThreshold={6}
+          touchStartThreshold={5}
           forceFallback={true}
           fallbackOnBody={true}
           fallbackTolerance={4}
@@ -958,10 +860,11 @@ export default function MainPage() {
             const item = itemsByKey[key]
             if (!item) return null
             const isSelected = selectedKeys.has(key)
+            const isFollowing = followingKeys.has(key)
             return (
               <div key={key}
                 data-id={key}
-                className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''}`}
+                className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''} ${isFollowing ? styles.gridItemFollowing : ''}`}
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}

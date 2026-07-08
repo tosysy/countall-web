@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ReactSortable } from 'react-sortablejs'
 import CounterCard from '../components/CounterCard'
@@ -478,7 +478,30 @@ export default function MainPage() {
   const getItemKey = (item) => `${item.type === 'counter' ? 'C' : 'F'}:${item.data.id}`
 
   // ── SortableJS ────────────────────────────────────────────────────────────
-  const sortableItems = items.map(item => ({ ...item, id: getItemKey(item) }))
+  // Índice por clave para buscar SIEMPRE el dato fresco del store (el valor de un
+  // contador cambia al incrementar, aunque su posición en la lista no).
+  const itemsByKey = useMemo(
+    () => Object.fromEntries(items.map(it => [getItemKey(it), it])),
+    [items]
+  )
+  // Orden canónico de claves derivado del store.
+  const derivedKeys = items.map(getItemKey)
+  const derivedKeysSig = derivedKeys.join('|')
+
+  // Lista LOCAL que controla SortableJS durante el arrastre. No la re-derivamos
+  // del store mientras se arrastra (eso hacía saltar/duplicar los elementos).
+  const isDraggingRef = useRef(false)
+  const [dragList, setDragList] = useState(() => derivedKeys.map(id => ({ id })))
+  const dragListRef = useRef(dragList)
+  dragListRef.current = dragList
+
+  // Sincronizar la lista local con el store SOLO cuando no se está arrastrando
+  // (al añadir/eliminar/entrar en carpeta o al reordenar desde otro dispositivo).
+  useEffect(() => {
+    if (isDraggingRef.current) return
+    setDragList(derivedKeys.map(id => ({ id })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [derivedKeysSig, currentFolderId])
 
   // ── Drag stack overlay (replica de la app Android) ──────────────────────────
   const draggingKeyRef    = useRef(null)
@@ -496,14 +519,14 @@ export default function MainPage() {
     return [...base.slice(0, at), ...others, ...base.slice(at)]
   }
 
+  // SortableJS reordena la lista LOCAL durante el arrastre; no tocamos el store aquí.
   const handleSetList = (newList) => {
-    const newOrder = applyMultiMove(newList.map(i => i.id), draggingKeyRef.current)
-    if (currentFolderId) setFolderOrder(currentFolderId, newOrder)
-    else setGridOrder(newOrder)
+    setDragList(newList)
   }
 
   const handleDragStart = (evt) => {
     cancelLongPress()
+    isDraggingRef.current = true
     const dk = evt.item?.getAttribute('data-id') ?? null
     draggingKeyRef.current = dk
     if (!dk || !selectedKeys.has(dk) || selectedKeys.size <= 1) return
@@ -613,7 +636,19 @@ export default function MainPage() {
     cancelAnimationFrame(stackRafRef.current)
     stackRafRef.current = null
 
+    // Confirmar el orden final (de la lista local) al store, aplicando el multi-move.
+    const finalOrder = applyMultiMove(
+      dragListRef.current.map(i => i.id),
+      draggingKeyRef.current
+    )
+    if (currentFolderId) setFolderOrder(currentFolderId, finalOrder)
+    else setGridOrder(finalOrder)
+
+    // Si hubo multi-move, reflejarlo también en la lista local para que no salte.
+    setDragList(finalOrder.map(id => ({ id })))
+
     draggingKeyRef.current = null
+    isDraggingRef.current = false
     push()
   }
 
@@ -904,21 +939,24 @@ export default function MainPage() {
           tag="div"
           className="counter-grid"
           key={currentFolderId ?? 'root'}
-          list={sortableItems}
+          list={dragList}
           setList={handleSetList}
           animation={150}
           ghostClass={styles.sortableGhost}
           chosenClass={styles.sortableChosen}
-          delay={150}
+          dragClass={styles.sortableDrag}
+          delay={180}
           delayOnTouchOnly={true}
-          touchStartThreshold={4}
+          touchStartThreshold={6}
           forceFallback={true}
-          fallbackTolerance={3}
+          fallbackOnBody={true}
+          fallbackTolerance={4}
           onStart={handleDragStart}
           onEnd={handleDragEnd}
         >
-          {sortableItems.map((item, idx) => {
-            const key = item.id
+          {dragList.map(({ id: key }, idx) => {
+            const item = itemsByKey[key]
+            if (!item) return null
             const isSelected = selectedKeys.has(key)
             return (
               <div key={key}
@@ -927,7 +965,7 @@ export default function MainPage() {
                 onPointerDown={() => !selectionMode && handleLongPress(key)}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
-                style={{ position: 'relative', animationDelay: `${idx * 35}ms` }}
+                style={{ position: 'relative' }}
               >
                 {item.type === 'counter' ? (
                   <CounterCard

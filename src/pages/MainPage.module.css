@@ -87,8 +87,16 @@
 }
 .sortableChosen {
   cursor: grabbing !important;
-  opacity: 0.9;
 }
+/* Clon flotante que sigue al cursor/dedo (forceFallback) */
+.sortableDrag {
+  opacity: 1 !important;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.34);
+  transform: scale(1.04);
+  cursor: grabbing !important;
+}
+.sortableDrag > * { opacity: 1 !important; }
 
 /* ── Modo selección ────────────────────────────────────────────────────────── */
 .selectionHeader {

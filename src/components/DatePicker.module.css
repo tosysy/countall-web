@@ -14,18 +14,26 @@
 }
 
 .sel {
-  background: var(--log-card-bg);
+  /* Fondo sólido del tema (el translúcido dejaba el desplegable nativo sin contraste) */
+  background: var(--card-bg);
   border: 1px solid var(--card-stroke);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 12px;
-  padding: 2px 2px;
+  padding: 3px 2px;
   cursor: pointer;
   outline: none;
   font-family: inherit;
-  max-width: 52px;
+  max-width: 56px;
 }
 .sel:focus { border-color: var(--accent); }
+
+/* Opciones de la lista desplegada, con los colores del tema */
+.sel option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+}
 
 .done {
   background: var(--btn-plus);

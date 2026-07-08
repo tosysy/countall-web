@@ -16,6 +16,8 @@ img { display: block; max-width: 100%; }
 
 /* ── Tema claro (por defecto) ────────────────────────────────────────────────── */
 :root {
+  /* Controles nativos (desplegables de <select>, scrollbars…) en el esquema del tema */
+  color-scheme: light;
   --bg: #EBEBEB;
   --card-bg: #FFFFFF;
   --card-stroke: #D1D1D1;
@@ -41,6 +43,7 @@ img { display: block; max-width: 100%; }
 
 /* ── Tema oscuro ─────────────────────────────────────────────────────────────── */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #000000;
   --card-bg: #383838;
   --card-stroke: #454545;

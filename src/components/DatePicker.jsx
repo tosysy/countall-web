@@ -1,10 +1,54 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from './DatePicker.module.css'
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
 function daysInMonth(month, year) {
   return new Date(year, month + 1, 0).getDate()
+}
+
+/**
+ * Desplegable propio (los <select> nativos no permiten esquinas redondeadas):
+ * botón con el valor + lista flotante redondeada con los colores del tema.
+ */
+function Dropdown({ value, options, labels, onSelect, width }) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+  const selectedRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    // Centrar la opción seleccionada y cerrar al tocar fuera
+    selectedRef.current?.scrollIntoView({ block: 'center' })
+    const close = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [open])
+
+  const label = labels ? labels[options.indexOf(value)] : String(value)
+
+  return (
+    <div className={styles.dropWrap} ref={wrapRef} style={{ width }}>
+      <button className={styles.dropBtn} onClick={() => setOpen(v => !v)}>
+        {label}
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" style={{ opacity: 0.6, flexShrink: 0 }}>
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </button>
+      {open && (
+        <div className={styles.dropList}>
+          {options.map((opt, i) => (
+            <button key={opt}
+              ref={opt === value ? selectedRef : undefined}
+              className={`${styles.dropItem} ${opt === value ? styles.dropItemActive : ''}`}
+              onClick={() => { onSelect(opt); setOpen(false) }}>
+              {labels ? labels[i] : String(opt)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function DatePicker({ value, onChange, disabled }) {
@@ -44,6 +88,7 @@ export default function DatePicker({ value, onChange, disabled }) {
 
   const yearNow = new Date().getFullYear()
   const years = Array.from({ length: 10 }, (_, i) => yearNow - 5 + i)
+  const days = Array.from({ length: daysInMonth(month, year) }, (_, i) => i + 1)
 
   if (disabled || !editing) {
     return (
@@ -64,17 +109,14 @@ export default function DatePicker({ value, onChange, disabled }) {
 
   return (
     <div className={styles.inlineEdit}>
-      <select className={styles.sel} value={day} onChange={e => handleDay(e.target.value)}>
-        {Array.from({ length: daysInMonth(month, year) }, (_, i) => i + 1).map(d => (
-          <option key={d} value={d}>{String(d).padStart(2,'0')}</option>
-        ))}
-      </select>
-      <select className={styles.sel} value={month} onChange={e => handleMonth(e.target.value)}>
-        {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-      </select>
-      <select className={styles.sel} value={year} onChange={e => handleYear(e.target.value)}>
-        {years.map(y => <option key={y} value={y}>{y}</option>)}
-      </select>
+      <Dropdown value={day} options={days}
+        labels={days.map(d => String(d).padStart(2, '0'))}
+        onSelect={handleDay} width={52} />
+      <Dropdown value={month} options={MONTHS.map((_, i) => i)}
+        labels={MONTHS}
+        onSelect={handleMonth} width={56} />
+      <Dropdown value={year} options={years}
+        onSelect={handleYear} width={62} />
       <button className={styles.done} onClick={() => setEditing(false)}>✓</button>
     </div>
   )

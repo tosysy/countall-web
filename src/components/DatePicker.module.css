@@ -13,27 +13,67 @@
   flex-wrap: nowrap;
 }
 
-.sel {
-  /* Fondo sólido del tema (el translúcido dejaba el desplegable nativo sin contraste) */
+/* ── Desplegable propio con la estética de la app ───────────────────────────── */
+
+.dropWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.dropBtn {
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  width: 100%;
   background: var(--card-bg);
   border: 1px solid var(--card-stroke);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-primary);
   font-size: 12px;
-  padding: 3px 2px;
+  padding: 4px 6px;
   cursor: pointer;
   outline: none;
   font-family: inherit;
-  max-width: 56px;
 }
-.sel:focus { border-color: var(--accent); }
+.dropBtn:hover { border-color: var(--accent); }
 
-/* Opciones de la lista desplegada, con los colores del tema */
-.sel option {
-  background: var(--card-bg);
+.dropList {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-height: 190px;
+  overflow-y: auto;
+  z-index: 300;
+  background: var(--dialog-bg);
+  border: 1px solid var(--card-stroke);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dropItem {
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  border-radius: 8px;
   color: var(--text-primary);
   font-size: 13px;
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  flex-shrink: 0;
 }
+.dropItem:hover { background: var(--log-card-bg); }
+
+.dropItemActive {
+  background: var(--text-primary);
+  color: var(--bg);
+  font-weight: 700;
+}
+.dropItemActive:hover { background: var(--text-primary); }
 
 .done {
   background: var(--btn-plus);

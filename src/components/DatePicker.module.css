@@ -36,13 +36,11 @@
 .dropBtn:hover { border-color: var(--accent); }
 
 .dropList {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 100%;
+  /* Renderizada en un portal sobre <body> con coordenadas fijas del viewport */
+  position: fixed;
   max-height: 190px;
   overflow-y: auto;
-  z-index: 300;
+  z-index: 10000;
   background: var(--dialog-bg);
   border: 1px solid var(--card-stroke);
   border-radius: 12px;

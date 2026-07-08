@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import styles from './DatePicker.module.css'
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -13,30 +14,58 @@ function daysInMonth(month, year) {
  */
 function Dropdown({ value, options, labels, onSelect, width }) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState(null) // { top, left, width } en coords de viewport
   const wrapRef = useRef(null)
+  const listRef = useRef(null)
   const selectedRef = useRef(null)
+
+  const openList = () => {
+    const r = wrapRef.current?.getBoundingClientRect()
+    if (!r) return
+    const LIST_H = 190
+    // Abrir hacia arriba si no cabe por debajo
+    const below = window.innerHeight - r.bottom
+    setPos({
+      left: Math.min(r.left, window.innerWidth - Math.max(r.width, 64) - 8),
+      width: Math.max(r.width, 64),
+      ...(below < LIST_H + 8 && r.top > LIST_H
+        ? { bottom: window.innerHeight - r.top + 4 }
+        : { top: r.bottom + 4 }),
+    })
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!open) return
-    // Centrar la opción seleccionada y cerrar al tocar fuera
+    // Centrar la opción seleccionada y cerrar al tocar fuera o hacer scroll
     selectedRef.current?.scrollIntoView({ block: 'center' })
-    const close = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false) }
+    const close = (e) => {
+      if (!wrapRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) setOpen(false)
+    }
+    const closeOnScroll = (e) => { if (!listRef.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
+    window.addEventListener('scroll', closeOnScroll, true)
+    window.addEventListener('resize', closeOnScroll)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('scroll', closeOnScroll, true)
+      window.removeEventListener('resize', closeOnScroll)
+    }
   }, [open])
 
   const label = labels ? labels[options.indexOf(value)] : String(value)
 
   return (
     <div className={styles.dropWrap} ref={wrapRef} style={{ width }}>
-      <button className={styles.dropBtn} onClick={() => setOpen(v => !v)}>
+      <button className={styles.dropBtn} onClick={() => (open ? setOpen(false) : openList())}>
         {label}
         <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" style={{ opacity: 0.6, flexShrink: 0 }}>
           <path d="M7 10l5 5 5-5z"/>
         </svg>
       </button>
-      {open && (
-        <div className={styles.dropList}>
+      {/* Portal a <body> con posición fija: la lista escapa de contenedores con overflow */}
+      {open && pos && createPortal(
+        <div className={styles.dropList} ref={listRef} style={pos}>
           {options.map((opt, i) => (
             <button key={opt}
               ref={opt === value ? selectedRef : undefined}
@@ -45,7 +74,8 @@ function Dropdown({ value, options, labels, onSelect, width }) {
               {labels ? labels[i] : String(opt)}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

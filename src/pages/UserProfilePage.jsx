@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getPublicProfile, getProfilesLite } from '../firebase/profileManager'
 import { getFriends, getFriendsOf, sendFriendRequest, acceptFriendRequest, removeFriend, getUserIdByUsername } from '../firebase/syncManager'
-import CompetitivePodium from '../components/CompetitivePodium'
 import CounterCard from '../components/CounterCard'
+import ExpandedCounter from '../components/ExpandedCounter'
 import useAppStore from '../store/appStore'
 import styles from './UserProfilePage.module.css'
 
@@ -322,50 +322,17 @@ export default function UserProfilePage() {
           </div>
         )}
 
-        {/* Contador público ampliado (solo lectura) */}
+        {/* Contador público ampliado — la misma vista que en la pantalla principal, en modo lectura */}
         {expanded && (
-          <div className={styles.overlay} onClick={() => setExpanded(null)}>
-            <div className={styles.expandedCard} onClick={e => e.stopPropagation()}>
-              <div className={styles.expandedHeader}>
-                <h2 className={styles.expandedName}>{expanded.name}</h2>
-                <button className="btn-icon" onClick={() => setExpanded(null)}>
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                </button>
-              </div>
-              {expanded.isCompetitive ? (
-                <CompetitivePodium
-                  scores={expanded.competitorScores ?? {}}
-                  usernames={expanded.competitorUsernames ?? {}}
-                  userColors={expanded.userColors ?? {}}
-                  targets={expanded.competitorTargets ?? {}}
-                  logEntries={expanded.competitorLogEntries ?? {}}
-                  increment={expanded.increment ?? 1}
-                  myUid={null}
-                  isOwner={false}
-                  canEdit={false}
-                />
-              ) : (
-                <>
-                  <p className={styles.expandedValue} style={{ color: expanded.color ?? undefined }}>{expanded.value}</p>
-                  {expanded.target != null && (
-                    <p className={styles.expandedTarget}>Objetivo: {expanded.target}</p>
-                  )}
-                  <div className={styles.logList}>
-                    {(expanded.logEntries ?? []).slice().reverse().map((e, i) => (
-                      <div key={i} className={styles.logEntry}>
-                        <span className={styles.logLabel}>{e.label || '•'}</span>
-                        <span className={styles.logText}>{e.text}</span>
-                        <span className={styles.logDate}>{e.date ? new Date(e.date).toLocaleDateString('es-ES') : ''}</span>
-                      </div>
-                    ))}
-                    {(expanded.logEntries ?? []).length === 0 && (
-                      <p className={styles.metaLine}>Sin registros</p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+          <ExpandedCounter
+            counter={{ ...expanded, role: 'viewer' }}
+            readOnly
+            onClose={() => setExpanded(null)}
+            onUpdate={() => {}}
+            onDelete={() => {}}
+            onIncrement={() => {}}
+            onDecrement={() => {}}
+          />
         )}
       </div>
     </div>

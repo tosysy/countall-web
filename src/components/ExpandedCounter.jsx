@@ -24,11 +24,12 @@ function luminance(hex) {
   return 0.299*r + 0.587*g + 0.114*b
 }
 
-export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false, initialTab = 'log', onRemoveFromFolder }) {
+export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, onIncrement, onDecrement, initialShowMenu = false, initialTab = 'log', onRemoveFromFolder, readOnly = false }) {
   const { user, username } = useAppStore()
 
-  const isOwner = counter.role === 'owner'
-  const canEdit = counter.role === 'owner' || counter.role === 'editor'
+  // readOnly: vista de contador público en el perfil de otro usuario (como Android)
+  const isOwner = !readOnly && counter.role === 'owner'
+  const canEdit = !readOnly && (counter.role === 'owner' || counter.role === 'editor')
   const bg = counter.backgroundImageLocal || counter.backgroundImageUrl
   const cardColor = counter.color
 
@@ -38,13 +39,15 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
     ? { background: cardColor, color: luminance(cardColor) > 0.55 ? '#333' : '#fff' }
     : bg ? { background: '#ffffff', color: '#333' } : {}
 
-  // Tabs
-  const tabs = [
-    'log',
-    ...(counter.isCompetitive ? ['competitive'] : []),
-    'settings',
-    ...(counter.isShared ? ['members'] : []),
-  ]
+  // Tabs (en modo lectura solo Notas y Podio)
+  const tabs = readOnly
+    ? ['log', ...(counter.isCompetitive ? ['competitive'] : [])]
+    : [
+      'log',
+      ...(counter.isCompetitive ? ['competitive'] : []),
+      'settings',
+      ...(counter.isShared ? ['members'] : []),
+    ]
   const tabLabels = { log: 'Notas', competitive: 'Podio', settings: 'Ajustes', members: 'Miembros' }
   const [tab, setTab] = useState(initialTab)
 
@@ -317,21 +320,23 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               )}
             </div>
 
-            {/* ⋮ menu */}
-            <div ref={menuRef}>
-              <button className={styles.heroBtn} aria-label="Menú"
-                onClick={() => {
-                  if (menuRef.current) {
-                    const r = menuRef.current.getBoundingClientRect()
-                    setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
-                  }
-                  setShowMenu(v => !v)
-                }}>
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                </svg>
-              </button>
-            </div>
+            {/* ⋮ menu (oculto en modo lectura) */}
+            {!readOnly && (
+              <div ref={menuRef}>
+                <button className={styles.heroBtn} aria-label="Menú"
+                  onClick={() => {
+                    if (menuRef.current) {
+                      const r = menuRef.current.getBoundingClientRect()
+                      setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+                    }
+                    setShowMenu(v => !v)
+                  }}>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Tarjeta del contador ─── */}
@@ -363,7 +368,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
                   {displayValue}
                 </button>
               )}
-              {counter.isCompetitive && myUid && (
+              {counter.isCompetitive && myUid && !readOnly && (
                 <p className={styles.heroOwnScore} style={!(bg || cardColor) ? { color: 'var(--text-secondary)' } : {}}>tú: {myScore}</p>
               )}
               {counter.target != null && !counter.isCompetitive && (

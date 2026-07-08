@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getPublicProfile, getProfilesLite } from '../firebase/profileManager'
 import { getFriends, getFriendsOf, sendFriendRequest, acceptFriendRequest, removeFriend, getUserIdByUsername } from '../firebase/syncManager'
 import CompetitivePodium from '../components/CompetitivePodium'
+import CounterCard from '../components/CounterCard'
 import useAppStore from '../store/appStore'
 import styles from './UserProfilePage.module.css'
 
@@ -229,22 +230,15 @@ export default function UserProfilePage() {
                 <span className={styles.cardName}>{f.name}</span>
               </button>
             ))}
-            {visibleCounters.map(c => {
-              const pct = c.target ? Math.min(100, (c.value / c.target) * 100) : null
-              return (
-                <button key={c.id} className={styles.counterCard}
-                  style={{
-                    background: c.backgroundImageUrl ? `url(${c.backgroundImageUrl}) center/cover` : (c.color ?? undefined),
-                  }}
-                  onClick={() => setExpanded(c)}>
-                  <span className={`${styles.cardName} ${(c.color || c.backgroundImageUrl) ? styles.onColor : ''}`}>{c.name}</span>
-                  <span className={`${styles.cardValue} ${(c.color || c.backgroundImageUrl) ? styles.onColor : ''}`}>{c.value}</span>
-                  {pct != null && (
-                    <div className={styles.cardProgress}><div style={{ width: `${pct}%` }} /></div>
-                  )}
-                </button>
-              )
-            })}
+            {/* Tarjeta real de contador con + y − visibles pero inertes (solo lectura, como Android) */}
+            {visibleCounters.map(c => (
+              <div key={c.id}>
+                <CounterCard
+                  counter={c}
+                  onClick={() => setExpanded(c)}
+                />
+              </div>
+            ))}
           </div>
         )}
 

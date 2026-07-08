@@ -66,14 +66,16 @@ function Dropdown({ value, options, labels, onSelect, width }) {
       {/* Portal a <body> con posición fija: la lista escapa de contenedores con overflow */}
       {open && pos && createPortal(
         <div className={styles.dropList} ref={listRef} style={pos}>
-          {options.map((opt, i) => (
-            <button key={opt}
-              ref={opt === value ? selectedRef : undefined}
-              className={`${styles.dropItem} ${opt === value ? styles.dropItemActive : ''}`}
-              onClick={() => { onSelect(opt); setOpen(false) }}>
-              {labels ? labels[i] : String(opt)}
-            </button>
-          ))}
+          <div className={styles.dropScroll}>
+            {options.map((opt, i) => (
+              <button key={opt}
+                ref={opt === value ? selectedRef : undefined}
+                className={`${styles.dropItem} ${opt === value ? styles.dropItemActive : ''}`}
+                onClick={() => { onSelect(opt); setOpen(false) }}>
+                {labels ? labels[i] : String(opt)}
+              </button>
+            ))}
+          </div>
         </div>,
         document.body
       )}

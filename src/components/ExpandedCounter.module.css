@@ -29,28 +29,27 @@
 .heroWrap {
   flex-shrink: 0;
   background: var(--bg);
-  padding: 0 14px 14px;
-  /* top bar de controles flotantes fuera de la tarjeta */
+  padding: max(14px, env(safe-area-inset-top) + 8px) 14px 14px;
 }
 
-/* Barra de controles cerrar/titulo/menu — sobre fondo del panel */
-.heroTop {
-  position: relative; z-index: 20;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 0 10px;
-  padding-top: max(10px, env(safe-area-inset-top) + 6px);
-  gap: 8px;
-}
-
-.heroBtn {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--log-card-bg);
-  color: var(--text-primary);
+/* Controles X / ⋮ dentro de las esquinas superiores de la tarjeta (como Android) */
+.heroCorner {
+  position: absolute;
+  top: 8px;
+  z-index: 5;
+  width: 38px; height: 38px;
+  border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  background: none; border: none; cursor: pointer;
   transition: background 0.15s;
 }
-.heroBtn:hover { background: var(--card-stroke); }
+.heroCorner:hover { background: rgba(128,128,128,0.25); }
+
+.heroCornerBtn {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+}
 
 /* La tarjeta del contador — con bordes redondeados visibles */
 .hero {
@@ -90,7 +89,8 @@
 .heroCardName {
   position: absolute; top: 0; left: 0; right: 0;
   z-index: 3;
-  padding: 14px 16px 28px;
+  /* hueco lateral para la X y el ⋮ de las esquinas */
+  padding: 16px 52px 28px;
   background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%);
   font-size: 17px; font-weight: 700;
   color: #fff;
@@ -166,11 +166,11 @@
 }
 @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
 
-/* Hero +/- buttons at bottom */
+/* Hero +/- en las esquinas inferiores, como la tarjeta de la cuadrícula */
 .heroButtons {
   position: relative; z-index: 2;
-  display: flex; gap: 20px; justify-content: center;
-  padding: 12px 0 20px;
+  display: flex; justify-content: space-between;
+  padding: 12px 18px 18px;
 }
 
 .heroMinus, .heroPlus {

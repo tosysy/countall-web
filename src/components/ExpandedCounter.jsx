@@ -39,17 +39,10 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
     ? { background: cardColor, color: luminance(cardColor) > 0.55 ? '#333' : '#fff' }
     : bg ? { background: '#ffffff', color: '#333' } : {}
 
-  // Tabs (en modo lectura solo Notas y Podio)
-  const tabs = readOnly
-    ? ['log', ...(counter.isCompetitive ? ['competitive'] : [])]
-    : [
-      'log',
-      ...(counter.isCompetitive ? ['competitive'] : []),
-      'settings',
-      ...(counter.isShared ? ['members'] : []),
-    ]
-  const tabLabels = { log: 'Notas', competitive: 'Podio', settings: 'Ajustes', members: 'Miembros' }
-  const [tab, setTab] = useState(initialTab)
+  // Sin pestañas (como Android): debajo de la tarjeta van las notas (o el podio
+  // en competitivos); Ajustes y Miembros se abren desde el menú ⋮.
+  const defaultTab = counter.isCompetitive ? 'competitive' : 'log'
+  const [tab, setTab] = useState(initialTab === 'log' ? defaultTab : initialTab)
 
   // Hero states
   const [showMenu, setShowMenu]         = useState(initialShowMenu)
@@ -300,46 +293,7 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
         {/* ── HERO WRAP — zona gris con padding alrededor de la tarjeta ── */}
         <div className={styles.heroWrap}>
 
-          {/* Barra superior: cerrar · título · menú (sobre fondo del panel) */}
-          <div className={styles.heroTop}>
-            <button className={styles.heroBtn} onClick={onClose} aria-label="Cerrar">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </button>
-
-            <div className={styles.heroTitleWrap}>
-              {editingName ? (
-                <input className={styles.heroNameInput} value={name} autoFocus maxLength={15}
-                  onChange={e => setName(e.target.value)}
-                  onBlur={saveName} onKeyDown={e => e.key === 'Enter' && saveName()} />
-              ) : (
-                <button className={styles.heroName} onClick={() => canEdit && setEditingName(true)}>
-                  {counter.name}
-                </button>
-              )}
-            </div>
-
-            {/* ⋮ menu (oculto en modo lectura) */}
-            {!readOnly && (
-              <div ref={menuRef}>
-                <button className={styles.heroBtn} aria-label="Menú"
-                  onClick={() => {
-                    if (menuRef.current) {
-                      const r = menuRef.current.getBoundingClientRect()
-                      setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
-                    }
-                    setShowMenu(v => !v)
-                  }}>
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                  </svg>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ── Tarjeta del contador ─── */}
+          {/* ── Tarjeta del contador (X y ⋮ dentro, como Android) ─── */}
           <div
             className={styles.hero}
             style={{
@@ -350,10 +304,47 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
           >
             {(bg || cardColor) && <div className={styles.heroOverlay} />}
 
-            {/* Nombre dentro de la tarjeta con gradiente superior */}
-            <div className={styles.heroCardName}>
-              <span>{counter.name}</span>
+            {/* Nombre dentro de la tarjeta con gradiente superior (clic = renombrar) */}
+            <div className={styles.heroCardName}
+              style={!(bg || cardColor) ? { color: 'var(--text-primary)', textShadow: 'none', background: 'none' } : {}}>
+              {editingName ? (
+                <input className={styles.heroNameInput}
+                  style={{ pointerEvents: 'auto', color: 'inherit', borderBottomColor: 'currentColor' }}
+                  value={name} autoFocus maxLength={15}
+                  onChange={e => setName(e.target.value)}
+                  onBlur={saveName} onKeyDown={e => e.key === 'Enter' && saveName()} />
+              ) : (
+                <span style={canEdit ? { pointerEvents: 'auto', cursor: 'pointer' } : {}}
+                  onClick={() => canEdit && setEditingName(true)}>
+                  {counter.name}
+                </span>
+              )}
             </div>
+
+            {/* X arriba-izquierda, dentro de la tarjeta (como Android) */}
+            <button className={styles.heroCorner} style={{ left: 8 }} onClick={onClose} aria-label="Cerrar">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke={(bg || cardColor) ? '#fff' : 'var(--text-primary)'} strokeWidth="2.5">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+
+            {/* ⋮ arriba-derecha, dentro de la tarjeta (oculto en modo lectura) */}
+            {!readOnly && (
+              <div ref={menuRef} className={styles.heroCorner} style={{ right: 8 }}>
+                <button className={styles.heroCornerBtn} aria-label="Menú"
+                  onClick={() => {
+                    if (menuRef.current) {
+                      const r = menuRef.current.getBoundingClientRect()
+                      setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+                    }
+                    setShowMenu(v => !v)
+                  }}>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill={(bg || cardColor) ? '#fff' : 'var(--text-primary)'}>
+                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                  </svg>
+                </button>
+              </div>
+            )}
 
             {/* Valor centrado */}
             <div className={styles.heroBody}>
@@ -379,17 +370,19 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               )}
             </div>
 
-            {/* Botones +/- dentro de la tarjeta */}
-            {canEdit && (
-              <div className={styles.heroButtons}>
-                <button className={styles.heroMinus} style={heroBtnMinusStyle} onClick={onDecrement} onContextMenu={e => e.preventDefault()}>
-                  <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
-                </button>
-                <button className={styles.heroPlus} style={heroBtnPlusStyle} onClick={onIncrement} onContextMenu={e => e.preventDefault()}>
-                  <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                </button>
-              </div>
-            )}
+            {/* Botones +/- en las esquinas inferiores; atenuados si no puedes editar (como Android) */}
+            <div className={styles.heroButtons}>
+              <button className={styles.heroMinus}
+                style={{ ...heroBtnMinusStyle, ...(canEdit ? {} : { opacity: 0.3, cursor: 'default' }) }}
+                onClick={canEdit ? onDecrement : undefined} onContextMenu={e => e.preventDefault()}>
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+              </button>
+              <button className={styles.heroPlus}
+                style={{ ...heroBtnPlusStyle, ...(canEdit ? {} : { opacity: 0.3, cursor: 'default' }) }}
+                onClick={canEdit ? onIncrement : undefined} onContextMenu={e => e.preventDefault()}>
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              </button>
+            </div>
           </div>
         </div>{/* end heroWrap */}
 
@@ -402,17 +395,22 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
           </div>
         )}
 
-        {/* ── TABS ─────────────────────────────────────────────────────── */}
-        <div className={styles.tabs}>
-          {tabs.map(t => (
-            <button key={t} className={`${styles.tab} ${tab === t ? styles.active : ''}`} onClick={() => setTab(t)}>
-              {tabLabels[t]}
-            </button>
-          ))}
-        </div>
-
-        {/* ── BODY ─────────────────────────────────────────────────────── */}
+        {/* ── BODY (sin pestañas, como Android) ─────────────────────────── */}
         <div className={styles.body}>
+
+          {/* Volver a las notas desde Ajustes/Miembros (abiertos desde el menú ⋮) */}
+          {(tab === 'settings' || tab === 'members') && (
+            <button
+              onClick={() => setTab(defaultTab)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px 12px',
+                background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M19 12H5M12 5l-7 7 7 7"/>
+              </svg>
+              {tab === 'settings' ? 'Ajustes' : 'Miembros'}
+            </button>
+          )}
 
           {/* ── Notas ── */}
           {tab === 'log' && (
@@ -801,6 +799,14 @@ export default function ExpandedCounter({ counter, onClose, onUpdate, onDelete, 
               onClick={() => { setShowMenu(false); setTab('settings') }}>
               <span style={menuIconStyle}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></span>
               Editar
+            </button>
+          )}
+          {/* Miembros (contadores compartidos) */}
+          {counter.isShared && (
+            <button className="portal-menu-item" style={menuItemStyle}
+              onClick={() => { setShowMenu(false); setTab('members') }}>
+              <span style={menuIconStyle}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>
+              Miembros
             </button>
           )}
           {/* Sacar de carpeta */}

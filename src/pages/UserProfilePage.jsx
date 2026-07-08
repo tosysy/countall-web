@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getPublicProfile } from '../firebase/profileManager'
-import { getFriends, sendFriendRequest, acceptFriendRequest, removeFriend, getUserIdByUsername } from '../firebase/syncManager'
+import { getPublicProfile, getProfilesLite } from '../firebase/profileManager'
+import { getFriends, getFriendsOf, sendFriendRequest, acceptFriendRequest, removeFriend, getUserIdByUsername } from '../firebase/syncManager'
 import CompetitivePodium from '../components/CompetitivePodium'
 import useAppStore from '../store/appStore'
 import styles from './UserProfilePage.module.css'
@@ -39,11 +39,19 @@ export default function UserProfilePage() {
   const [relation, setRelation] = useState('none')  // none | sent | received | accepted
   const [folderStack, setFolderStack] = useState([]) // navegación por carpetas públicas
   const [expanded, setExpanded] = useState(null)     // contador público ampliado
+  const [showFriends, setShowFriends] = useState(false)
+  const [friendsList, setFriendsList] = useState(undefined) // undefined=cargando, null=sin permiso, []=vacía
+  const [myRelations, setMyRelations] = useState({})        // uid → 'accepted' | 'sent' | 'received'
 
   useEffect(() => {
     let alive = true
     setProfile(undefined)
     setTargetUid(null)
+    setRelation('none')
+    setFolderStack([])
+    setExpanded(null)
+    setShowFriends(false)
+    setFriendsList(undefined)
     getUserIdByUsername(handle).catch(() => null).then(uid => {
       if (alive) setTargetUid(uid ?? handle) // retrocompatibilidad con enlaces por uid
     })
@@ -62,6 +70,43 @@ export default function UserProfilePage() {
     }).catch(() => {})
     return () => { alive = false }
   }, [targetUid])
+
+  // Lista de amigos del perfil (como FriendsListActivity en Android)
+  const openFriendsList = async () => {
+    setShowFriends(true)
+    setFriendsList(undefined)
+    try {
+      const list = await getFriendsOf(targetUid)
+      // Fotos y nombre completo desde publicProfiles
+      const profiles = await getProfilesLite(list.map(f => f.uid)).catch(() => ({}))
+      const enriched = list.map(f => ({ ...f, ...profiles[f.uid], username: profiles[f.uid]?.username || f.username }))
+      setFriendsList(enriched)
+      // Mi relación con cada uno, para el botón de acción de cada fila
+      const mine = await getFriends().catch(() => [])
+      const rel = {}
+      mine.forEach(f => { rel[f.uid] = f.status === 'accepted' ? 'accepted' : (f.direction === 'sent' ? 'sent' : 'received') })
+      setMyRelations(rel)
+    } catch {
+      setFriendsList(null) // las reglas solo dejan verla a sus amigos
+    }
+  }
+
+  const handleRowAction = async (f) => {
+    const state = myRelations[f.uid] ?? 'none'
+    try {
+      if (state === 'none') {
+        await sendFriendRequest(f.uid, f.username)
+        setMyRelations(r => ({ ...r, [f.uid]: 'sent' }))
+      } else if (state === 'received') {
+        await acceptFriendRequest(f.uid)
+        setMyRelations(r => ({ ...r, [f.uid]: 'accepted' }))
+      } else if (state === 'accepted') {
+        if (!confirm(`¿Eliminar a ${f.username} de tus amigos?`)) return
+        await removeFriend(f.uid)
+        setMyRelations(r => ({ ...r, [f.uid]: 'none' }))
+      }
+    } catch (e) { alert(e.message) }
+  }
 
   const handleFriendAction = async () => {
     try {
@@ -144,11 +189,11 @@ export default function UserProfilePage() {
             )}
           </div>
 
-          {/* Nº de amigos grande, como Android */}
-          <div className={styles.friendCount}>
+          {/* Nº de amigos grande, como Android — tocar abre su lista de amigos */}
+          <button className={styles.friendCount} onClick={openFriendsList}>
             <span className={styles.friendCountNumber}>{profile.friendCount}</span>
             <span className={styles.friendCountLabel}>amigo{profile.friendCount === 1 ? '' : 's'}</span>
-          </div>
+          </button>
 
           {infoLine && <p className={styles.infoLine}>{infoLine}</p>}
 
@@ -200,6 +245,86 @@ export default function UserProfilePage() {
                 </button>
               )
             })}
+          </div>
+        )}
+
+        {/* Lista de amigos del perfil (como FriendsListActivity) */}
+        {showFriends && (
+          <div className={styles.overlay} onClick={() => setShowFriends(false)}>
+            <div className={styles.expandedCard} onClick={e => e.stopPropagation()}>
+              <div className={styles.expandedHeader}>
+                <h2 className={styles.expandedName}>
+                  {isSelf ? 'Tus amigos' : `Amigos de ${profile.username}`}
+                </h2>
+                <button className="btn-icon" onClick={() => setShowFriends(false)}>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+              </div>
+
+              {friendsList === undefined && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+                  <span className="spinner" />
+                </div>
+              )}
+              {friendsList === null && (
+                <p className={styles.metaLine} style={{ textAlign: 'center', padding: '16px 0' }}>
+                  Solo sus amigos pueden ver esta lista
+                </p>
+              )}
+              {Array.isArray(friendsList) && friendsList.length === 0 && (
+                <p className={styles.metaLine} style={{ textAlign: 'center', padding: '16px 0' }}>
+                  Todavía no tiene amigos
+                </p>
+              )}
+              {Array.isArray(friendsList) && friendsList.map(f => {
+                const state = f.uid === myUid ? 'self' : (myRelations[f.uid] ?? 'none')
+                const ACTION = {
+                  none:     { label: 'Añadir', solid: true },
+                  sent:     { label: 'Enviada', solid: false },
+                  received: { label: 'Aceptar', solid: true },
+                  accepted: { label: 'Amigo ✓', solid: false },
+                }[state]
+                return (
+                  <div key={f.uid}
+                    onClick={() => { setShowFriends(false); navigate(`/user/${f.username || f.uid}`) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                      marginBottom: 8, borderRadius: 14, border: '1px solid var(--card-stroke)',
+                      cursor: 'pointer' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: f.photoUrl ? 'transparent' : avatarColor(f.username),
+                      color: '#fff', fontWeight: 800, fontSize: 18 }}>
+                      {f.photoUrl
+                        ? <img src={f.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : (f.username?.[0]?.toUpperCase() ?? '?')}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {f.fullName?.trim() || f.username}
+                      </p>
+                      {f.fullName?.trim() && (
+                        <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {f.username}
+                        </p>
+                      )}
+                    </div>
+                    {state !== 'self' && (
+                      <button
+                        onClick={e => { e.stopPropagation(); if (state !== 'sent') handleRowAction(f) }}
+                        style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 10, fontSize: 13,
+                          fontWeight: 700, cursor: state === 'sent' ? 'default' : 'pointer', fontFamily: 'inherit',
+                          border: ACTION.solid ? 'none' : '1px solid var(--card-stroke)',
+                          background: ACTION.solid ? 'var(--text-primary)' : 'transparent',
+                          color: ACTION.solid ? 'var(--bg)' : 'var(--text-secondary)' }}>
+                        {ACTION.label}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 

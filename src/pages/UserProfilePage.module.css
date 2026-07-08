@@ -98,7 +98,14 @@
   align-items: center;
   margin-top: 16px;
   padding: 4px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 12px;
 }
+
+.friendCount:hover { background: var(--log-card-bg); }
 
 .friendCountNumber {
   font-size: 38px;

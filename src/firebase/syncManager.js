@@ -517,6 +517,26 @@ export async function getFriends() {
   return list
 }
 
+/**
+ * Amigos ACEPTADOS de otro usuario (como Android getFriendsOf). Las reglas
+ * solo permiten leer friends/{targetUid} a sus amigos aceptados o a él mismo;
+ * si no hay permiso, lanza y el caller muestra el estado correspondiente.
+ */
+export async function getFriendsOf(targetUid) {
+  const snap = await get(ref(db, `friends/${targetUid}`))
+  const list = []
+  snap.forEach(c => {
+    if (!c.key) return
+    if (c.child('status').val() !== 'accepted') return
+    list.push({
+      uid: c.key,
+      username: c.child('username').val() ?? '',
+      addedAt: c.child('addedAt').val() ?? 0,
+    })
+  })
+  return list
+}
+
 export function listenFriendRequests(onUpdate) {
   const me = uid(); if (!me) return () => {}
   const r = ref(db, `friends/${me}`)

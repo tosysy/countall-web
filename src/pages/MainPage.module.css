@@ -80,23 +80,37 @@
 }
 
 /* ── Drag & Drop (SortableJS) ──────────────────────────────────────────────── */
+/* Hueco que queda al levantar la tarjeta: slot vacío con borde discontinuo.
+   El contenido se oculta (visibility: hidden mantiene el tamaño del slot). */
 .sortableGhost {
-  opacity: 0.35;
-  border-radius: 16px;
-  background: var(--log-card-bg) !important;
+  opacity: 1 !important;
 }
-.sortableChosen {
-  cursor: grabbing !important;
+.sortableGhost > * { visibility: hidden; }
+.sortableGhost::after {
+  content: '';
+  position: absolute; inset: 0;
+  border: 2px dashed var(--card-stroke);
+  border-radius: 20px;
+  background: var(--log-card-bg);
 }
-/* Clon flotante que sigue al cursor/dedo (forceFallback) */
+
+/* Item elegido (queda en su sitio en modo fallback) */
+.sortableChosen { cursor: grabbing !important; }
+
+/* Clon flotante que sigue al cursor/dedo (forceFallback) — "tarjeta levantada".
+   SortableJS posiciona el clon con transform inline, así que el efecto de
+   levantado (escala + sombra) se aplica al HIJO, no al contenedor. */
 .sortableDrag {
   opacity: 1 !important;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.34);
-  transform: scale(1.04);
   cursor: grabbing !important;
 }
-.sortableDrag > * { opacity: 1 !important; }
+.sortableDrag > * {
+  visibility: visible !important;
+  opacity: 1 !important;
+  border-radius: 20px;
+  transform: scale(1.06);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.42);
+}
 
 /* ── Modo selección ────────────────────────────────────────────────────────── */
 .selectionHeader {
@@ -116,8 +130,10 @@
 
 .gridItem {
   position: relative;
-  animation: cardEnter 0.35s cubic-bezier(0.34, 1.1, 0.64, 1) both;
-  will-change: transform, opacity;
+  /* 'backwards' en vez de 'both': la animación de entrada NO debe dejar
+     bloqueado el transform al terminar, o SortableJS no puede animar el
+     desplazamiento de los vecinos para abrir el hueco. */
+  animation: cardEnter 0.3s cubic-bezier(0.34, 1.1, 0.64, 1) backwards;
   touch-action: manipulation;
 }
 .gridItem[draggable="true"] { cursor: grab; }

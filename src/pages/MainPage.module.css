@@ -99,10 +99,20 @@
 
 /* Clon flotante que sigue al cursor/dedo (forceFallback) — "tarjeta levantada".
    SortableJS posiciona el clon con transform inline, así que el efecto de
-   levantado (escala + sombra) se aplica al HIJO, no al contenedor. */
+   levantado (escala + sombra) se aplica al HIJO, no al contenedor.
+   CLAVE: animation:none — el clon hereda la clase .gridItem cuya animación de
+   entrada (cardEnter) anima transform y peleaba con el transform de SortableJS,
+   dejando el contador descolocado del cursor hasta que la animación terminaba. */
 .sortableDrag {
   opacity: 1 !important;
   cursor: grabbing !important;
+  animation: none !important;
+  transition: none !important;
+}
+/* SortableJS también añade la clase global sortable-fallback al mismo clon */
+:global(.sortable-fallback) {
+  animation: none !important;
+  transition: none !important;
 }
 .sortableDrag > * {
   visibility: visible !important;

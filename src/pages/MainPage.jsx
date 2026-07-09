@@ -864,6 +864,7 @@ export default function MainPage() {
           forceFallback={true}
           fallbackOnBody={true}
           fallbackTolerance={4}
+          invertSwap={true}
           onStart={handleDragStart}
           onEnd={handleDragEnd}
         >

@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  # Cancela un deploy anterior (p. ej. atascado en cola) en vez de encolar detrás.
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -44,6 +45,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    # Si GitHub no asigna runner en unos minutos, falla rápido en vez de colgarse.
+    timeout-minutes: 10
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

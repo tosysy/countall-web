@@ -198,9 +198,4 @@ const useAppStore = create(
   )
 )
 
-// Solo en desarrollo: exponer el store para depurar/probar (no se incluye en el build).
-if (import.meta.env.DEV && typeof window !== 'undefined') {
-  window.__store = useAppStore
-}
-
 export default useAppStore

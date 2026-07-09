@@ -519,9 +519,19 @@ export default function MainPage() {
     return [...base.slice(0, at), ...others, ...base.slice(at)]
   }
 
-  // SortableJS reordena la lista LOCAL durante el arrastre; no tocamos el store aquí.
+  // react-sortablejs llama a setList con el orden YA reordenado (y él mismo revierte
+  // el DOM para que React sea la fuente de verdad). Aquí actualizamos la lista local
+  // Y confirmamos el orden al store — este es el sitio con el orden correcto.
+  // (Antes se confirmaba en onEnd leyendo un ref viejo → el orden "volvía a su sitio".
+  //  No dependemos del orden setList/onEnd: solo confirmamos si el orden cambió.)
   const handleSetList = (newList) => {
     setDragList(newList)
+    const newOrder = newList.map(i => i.id)
+    const curOrder = currentFolderId ? (folderOrders[currentFolderId] ?? []) : gridOrder
+    if (newOrder.join('|') === curOrder.join('|')) return // sin cambios (p. ej. montaje)
+    const finalOrder = applyMultiMove(newOrder, draggingKeyRef.current)
+    if (currentFolderId) setFolderOrder(currentFolderId, finalOrder)
+    else setGridOrder(finalOrder)
   }
 
   const handleDragStart = (evt) => {
@@ -544,22 +554,11 @@ export default function MainPage() {
   }
 
   const handleDragEnd = () => {
+    // Solo limpieza: el orden ya se confirmó en handleSetList.
     setFollowingKeys(new Set())
-    setTimeout(sweepDragGhosts, 0)
-
-    // Confirmar el orden final (de la lista local) al store, aplicando el multi-move.
-    const finalOrder = applyMultiMove(
-      dragListRef.current.map(i => i.id),
-      draggingKeyRef.current
-    )
-    if (currentFolderId) setFolderOrder(currentFolderId, finalOrder)
-    else setGridOrder(finalOrder)
-
-    // Si hubo multi-move, reflejarlo también en la lista local para que no salte.
-    setDragList(finalOrder.map(id => ({ id })))
-
-    draggingKeyRef.current = null
     isDraggingRef.current = false
+    // Diferir la limpieza para no depender de si setList corre antes o después de onEnd.
+    setTimeout(() => { sweepDragGhosts(); draggingKeyRef.current = null }, 0)
     push()
   }
 
@@ -859,8 +858,8 @@ export default function MainPage() {
           ghostClass={styles.sortableGhost}
           chosenClass={styles.sortableChosen}
           dragClass={styles.sortableDrag}
-          delay={200}
-          delayOnTouchOnly={false}
+          delay={150}
+          delayOnTouchOnly={true}
           touchStartThreshold={8}
           forceFallback={true}
           fallbackOnBody={true}

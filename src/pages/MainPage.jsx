@@ -535,8 +535,17 @@ export default function MainPage() {
     }
   }
 
+  // Barre cualquier clon flotante que SortableJS pudiera dejar huérfano en el body
+  // (p. ej. si un arrastre se interrumpe por una re-renderización). Evita tarjetas fantasma.
+  const sweepDragGhosts = () => {
+    document.querySelectorAll(
+      'body > .sortable-fallback, body > [class*="sortableDrag"]'
+    ).forEach(el => el.remove())
+  }
+
   const handleDragEnd = () => {
     setFollowingKeys(new Set())
+    setTimeout(sweepDragGhosts, 0)
 
     // Confirmar el orden final (de la lista local) al store, aplicando el multi-move.
     const finalOrder = applyMultiMove(
@@ -553,6 +562,9 @@ export default function MainPage() {
     isDraggingRef.current = false
     push()
   }
+
+  // Al desmontar (o cambiar de carpeta) barrer clones huérfanos por si se navegó a media reordenación.
+  useEffect(() => () => sweepDragGhosts(), [currentFolderId])
 
   const handleRemoveFromFolder = (counter) => {
     if (!counter.folderId) return
@@ -847,9 +859,9 @@ export default function MainPage() {
           ghostClass={styles.sortableGhost}
           chosenClass={styles.sortableChosen}
           dragClass={styles.sortableDrag}
-          delay={120}
-          delayOnTouchOnly={true}
-          touchStartThreshold={5}
+          delay={200}
+          delayOnTouchOnly={false}
+          touchStartThreshold={8}
           forceFallback={true}
           fallbackOnBody={true}
           fallbackTolerance={4}

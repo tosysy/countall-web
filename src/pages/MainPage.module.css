@@ -106,11 +106,19 @@
 .sortableDrag {
   opacity: 1 !important;
   cursor: grabbing !important;
+}
+/* CLAVE: ni el clon ni NINGÚN elemento de su interior deben tener transición o
+   animación de transform. La tarjeta interior (.cardOuter) tenía
+   'transition: transform 0.15s', que hacía que el clon persiguiera al cursor con
+   retraso en movimientos rápidos. Lo anulamos en todo el subárbol del clon. */
+.sortableDrag,
+.sortableDrag * {
   animation: none !important;
   transition: none !important;
 }
 /* SortableJS también añade la clase global sortable-fallback al mismo clon */
-:global(.sortable-fallback) {
+:global(.sortable-fallback),
+:global(.sortable-fallback *) {
   animation: none !important;
   transition: none !important;
 }

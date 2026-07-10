@@ -553,8 +553,40 @@ export default function MainPage() {
     draggingKeyRef.current = dk
     // Multi-drag: atenuar los demás seleccionados; se agruparán al soltar.
     if (dk && selectedKeys.has(dk) && selectedKeys.size > 1) {
-      setFollowingKeys(new Set([...selectedKeys].filter(k => k !== dk)))
+      const others = [...selectedKeys].filter(k => k !== dk) // orden de selección
+      setFollowingKeys(new Set(others))
+      buildMultiDragStack(others, selectedKeys.size)
     }
+  }
+
+  // Muestra en el clon flotante de SortableJS un "montón" con los demás contadores
+  // seleccionados (por orden de selección) + una insignia con el total. Se construye
+  // DENTRO del clon, así SortableJS lo elimina solo al soltar (sin tarjetas fantasma).
+  const buildMultiDragStack = (others, total) => {
+    requestAnimationFrame(() => {
+      const clone = document.querySelector('.sortable-fallback')
+      if (!clone) return
+      clone.style.overflow = 'visible'
+      others.slice(0, 4).forEach((k, idx) => {
+        const orig = document.querySelector(`.counter-grid > [data-id="${k}"]`)?.firstElementChild
+        if (!orig) return
+        const mini = orig.cloneNode(true)
+        const d = idx + 1
+        mini.style.cssText =
+          `position:absolute;inset:0;pointer-events:none;border-radius:20px;` +
+          `transform:translate(${d * 9}px,${d * 9}px) scale(${1 - d * 0.03}) rotate(${d * 2.5}deg);` +
+          `box-shadow:0 10px 26px rgba(0,0,0,.32);`
+        clone.insertBefore(mini, clone.firstChild) // los primeros seleccionados quedan más cerca del principal
+      })
+      const badge = document.createElement('div')
+      badge.textContent = String(total)
+      badge.style.cssText =
+        `position:absolute;top:-10px;right:-10px;z-index:20;min-width:26px;height:26px;padding:0 7px;` +
+        `border-radius:999px;display:flex;align-items:center;justify-content:center;` +
+        `background:var(--btn-plus);color:var(--icon-on-brand);font-size:13px;font-weight:800;` +
+        `box-shadow:0 4px 12px rgba(0,0,0,.35);`
+      clone.appendChild(badge)
+    })
   }
 
   // Barre cualquier clon flotante que SortableJS pudiera dejar huérfano en el body

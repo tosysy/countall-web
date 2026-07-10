@@ -551,11 +551,30 @@ export default function MainPage() {
     isDraggingRef.current = true
     const dk = evt.item?.getAttribute('data-id') ?? null
     draggingKeyRef.current = dk
-    // Multi-drag: atenuar los demás seleccionados; se agruparán al soltar.
+    // Multi-drag: los demás seleccionados dejan su hueco JUNTO al del arrastrado
+    // (donde van a caer), no en su posición original.
     if (dk && selectedKeys.has(dk) && selectedKeys.size > 1) {
       const others = [...selectedKeys].filter(k => k !== dk) // orden de selección
       setFollowingKeys(new Set(others))
       buildMultiDragStack(others, selectedKeys.size)
+      requestAnimationFrame(regroupFollowerGaps)
+    }
+  }
+
+  // Mueve en el DOM los huecos de los acompañantes para que sigan pegados al hueco
+  // del contador arrastrado (el ghost), de modo que se vean N huecos agrupados en el
+  // punto donde caerán al soltar. Se llama en cada cambio de posición del arrastre.
+  const regroupFollowerGaps = () => {
+    const dk = draggingKeyRef.current
+    if (!dk) return
+    const grid = document.querySelector('.counter-grid')
+    if (!grid) return
+    const ghost = grid.querySelector('.' + styles.sortableGhost)
+    if (!ghost) return
+    let anchor = ghost
+    for (const k of [...selectedKeys].filter(k => k !== dk)) {
+      const node = grid.querySelector(`[data-id="${k}"]`)
+      if (node && node !== anchor) { anchor.after(node); anchor = node }
     }
   }
 
@@ -910,6 +929,7 @@ export default function MainPage() {
           fallbackTolerance={4}
           invertSwap={true}
           onStart={handleDragStart}
+          onChange={regroupFollowerGaps}
           onEnd={handleDragEnd}
         >
           {dragList.map(({ id: key }, idx) => {

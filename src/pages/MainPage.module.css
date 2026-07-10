@@ -160,10 +160,16 @@
 
 /* Ítems seleccionados que "acompañan" al arrastrado en multi-drag: solo se
    atenúan (nada de transform, que chocaría con las animaciones de SortableJS). */
-/* Los demás seleccionados desaparecen de la cuadrícula durante el multi-arrastre
-   (como el que arrastras deja su hueco); se reagrupan en el destino al soltar. */
-.gridItemFollowing {
-  display: none;
+/* Cada uno de los demás seleccionados deja un hueco (igual que el que arrastras),
+   de modo que se ven tantos espacios como contadores seleccionados. Al soltar se
+   reagrupan en el destino. */
+.gridItemFollowing > * { visibility: hidden; }
+.gridItemFollowing::after {
+  content: '';
+  position: absolute; inset: 0;
+  border: 2px dashed var(--card-stroke);
+  border-radius: 20px;
+  background: var(--log-card-bg);
 }
 
 @keyframes cardEnter {

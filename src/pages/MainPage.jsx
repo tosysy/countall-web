@@ -232,9 +232,20 @@ export default function MainPage() {
   const { saveHistory } = useAppStore.getState()
 
   // ── Modo selección ────────────────────────────────────────────────────────
+  // Al entrar en selección por pulsación larga, el soltar dispara un click sobre
+  // la misma tarjeta; sin esto ese click ejecutaría toggleSelect y la desmarcaría.
+  const justLongPressedRef = useRef(false)
   const enterSelection = (key) => {
     setSelectionMode(true)
     setSelectedKeys(new Set([key]))
+    justLongPressedRef.current = true
+    setTimeout(() => { justLongPressedRef.current = false }, 500)
+  }
+  // Devuelve true si hay que ignorar este click (el que sigue a la pulsación larga).
+  const consumeLongPressClick = () => {
+    if (!justLongPressedRef.current) return false
+    justLongPressedRef.current = false
+    return true
   }
   const exitSelection = () => { setSelectionMode(false); setSelectedKeys(new Set()) }
   const toggleSelect = (key) => {
@@ -887,7 +898,7 @@ export default function MainPage() {
                     counter={item.data}
                     onIncrement={() => !selectionMode && handleIncrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
                     onDecrement={() => !selectionMode && handleDecrement(useAppStore.getState().counters.find(c => c.id === item.data.id) ?? item.data)}
-                    onClick={(c) => selectionMode ? toggleSelect(key) : (setExpandedInitialTab('log'), setExpanded(c))}
+                    onClick={(c) => { if (selectionMode) { if (!consumeLongPressClick()) toggleSelect(key) } else { setExpandedInitialTab('log'); setExpanded(c) } }}
                     onMenu={!selectionMode ? (c, e) => {
                       const r = e.currentTarget.getBoundingClientRect()
                       setCounterMenu({ counter: c, top: r.bottom + 4, right: window.innerWidth - r.right })
@@ -900,7 +911,7 @@ export default function MainPage() {
                     folderCounters={getFolderCounters(item.data.id)}
                     subFolders={folders.filter(f => f.parentFolderId === item.data.id)}
                     folderOrder={folderOrders[item.data.id] ?? []}
-                    onClick={(f) => selectionMode ? toggleSelect(key) : setCurrentFolder(f.id)}
+                    onClick={(f) => { if (selectionMode) { if (!consumeLongPressClick()) toggleSelect(key) } else setCurrentFolder(f.id) }}
                     onMenu={!selectionMode ? handleFolderMenu : undefined}
                   />
                 )}

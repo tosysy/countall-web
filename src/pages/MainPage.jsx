@@ -234,12 +234,13 @@ export default function MainPage() {
   // ── Modo selección ────────────────────────────────────────────────────────
   // Al entrar en selección por pulsación larga, el soltar dispara un click sobre
   // la misma tarjeta; sin esto ese click ejecutaría toggleSelect y la desmarcaría.
+  // El flag NO se limpia por tiempo (mantener pulsado más de la cuenta lo borraría
+  // antes de soltar): se consume en ese click y se resetea al iniciar otra pulsación.
   const justLongPressedRef = useRef(false)
   const enterSelection = (key) => {
     setSelectionMode(true)
     setSelectedKeys(new Set([key]))
     justLongPressedRef.current = true
-    setTimeout(() => { justLongPressedRef.current = false }, 500)
   }
   // Devuelve true si hay que ignorar este click (el que sigue a la pulsación larga).
   const consumeLongPressClick = () => {
@@ -888,7 +889,7 @@ export default function MainPage() {
               <div key={key}
                 data-id={key}
                 className={`${styles.gridItem} ${isSelected ? styles.gridItemSelected : ''} ${isFollowing ? styles.gridItemFollowing : ''}`}
-                onPointerDown={() => !selectionMode && handleLongPress(key)}
+                onPointerDown={() => { justLongPressedRef.current = false; if (!selectionMode) handleLongPress(key) }}
                 onPointerUp={cancelLongPress}
                 onPointerLeave={cancelLongPress}
                 style={{ position: 'relative' }}

@@ -574,7 +574,11 @@ export default function MainPage() {
     let anchor = ghost
     for (const k of [...selectedKeys].filter(k => k !== dk)) {
       const node = grid.querySelector(`[data-id="${k}"]`)
-      if (node && node !== anchor) { anchor.after(node); anchor = node }
+      if (!node) continue
+      // CLAVE: mover SOLO si no está ya justo tras el ancla. Reinsertarlo cada
+      // onChange (que se dispara mucho cerca del borde) causaba el parpadeo.
+      if (anchor.nextElementSibling !== node) anchor.after(node)
+      anchor = node
     }
   }
 
